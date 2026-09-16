@@ -1,0 +1,73 @@
+import type { Location } from "./types";
+export const locations: Location[] = [
+  {
+    id: "cebu",
+    name: "Cebu City",
+    region: "Central Visayas",
+    latitude: 10.3157,
+    longitude: 123.8854,
+  },
+  {
+    id: "mandaue",
+    name: "Mandaue",
+    region: "Central Visayas",
+    latitude: 10.3236,
+    longitude: 123.9222,
+  },
+  {
+    id: "lapu-lapu",
+    name: "Lapu-Lapu",
+    region: "Central Visayas",
+    latitude: 10.3103,
+    longitude: 123.9494,
+  },
+  {
+    id: "manila",
+    name: "Manila",
+    region: "Metro Manila",
+    latitude: 14.5995,
+    longitude: 120.9842,
+  },
+  {
+    id: "quezon-city",
+    name: "Quezon City",
+    region: "Metro Manila",
+    latitude: 14.676,
+    longitude: 121.0437,
+  },
+  {
+    id: "marikina",
+    name: "Marikina",
+    region: "Metro Manila",
+    latitude: 14.6507,
+    longitude: 121.1029,
+  },
+  {
+    id: "davao",
+    name: "Davao City",
+    region: "Davao Region",
+    latitude: 7.1907,
+    longitude: 125.4553,
+  },
+  {
+    id: "cagayan-de-oro",
+    name: "Cagayan de Oro",
+    region: "Northern Mindanao",
+    latitude: 8.4542,
+    longitude: 124.6319,
+  },
+  {
+    id: "iloilo",
+    name: "Iloilo City",
+    region: "Western Visayas",
+    latitude: 10.7202,
+    longitude: 122.5621,
+  },
+  {
+    id: "baguio",
+    name: "Baguio",
+    region: "Cordillera",
+    latitude: 16.4023,
+    longitude: 120.596,
+  },
+];
