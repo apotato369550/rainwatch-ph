@@ -18,6 +18,7 @@ import { LearnSection } from "./learn-section";
 import { ConditionsCard } from "./conditions-card";
 import { RainfallSummary } from "./rainfall-summary";
 import { StressGauge } from "./stress-gauge";
+import { MlForecast } from "./ml-forecast";
 import { RainfallChart } from "./rainfall-chart";
 const RainfallMap = dynamic(() => import("./rainfall-map"), {
   ssr: false,
@@ -81,6 +82,7 @@ export function Dashboard() {
           <a className="nav-active" href="#today">Today</a>
           <a href="#forecast">Forecast</a>
           <a href="#map">Map</a>
+          <a href="/history">History</a>
           <a href="#learn">Learn</a>
           <a href="#methodology">How it works</a>
         </nav>
@@ -129,7 +131,7 @@ export function Dashboard() {
         <div className="notice">
           <Info size={17} />
           <p>
-            Rainfall Stress is a guide to forecast conditions—not a flood prediction or an official warning.
+            Rainfall Stress is an experimental indicator and is NOT a flood prediction. It currently uses the raw Open-Meteo forecast.
           </p>
         </div>
         {error && (
@@ -150,6 +152,7 @@ export function Dashboard() {
           {visible ? (
             <>
               <RainfallSummary data={visible} />
+              <MlForecast data={visible} />
               <section className="plain-language panel">
                 <span className="eyebrow">What this means</span>
                 <h2>

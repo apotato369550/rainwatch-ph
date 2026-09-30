@@ -5,3 +5,7 @@ node_modules/
 playwright-report/
 test-results/
 .env*
+plans/
+!.env.example
+
+supabase/.temp/

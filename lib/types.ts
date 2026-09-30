@@ -42,5 +42,6 @@ export interface RainfallRisk {
   stressLevel: StressLevel;
   contributingFactors: ContributingFactor[];
   missingFeatures: string[];
-  hourly: { time: number; rainfall: number; probability: number | null }[];
+  hourly: { time: number; rainfall: number; probability: number | null; correctedRainfall?: number | null }[];
+  mlForecast: { rawNext6h: number; correctedNext6h: number | null; modelName: string | null; modelVersion: string | null; improvementKnown: boolean };
 }

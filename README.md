@@ -108,3 +108,87 @@ Future persistence can store the shared `RainfallRisk` output without changing p
 Weather data: [Open-Meteo](https://open-meteo.com/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The free endpoint is intended for non-commercial use, with provider usage limits; review [current terms](https://open-meteo.com/en/terms) before commercial deployment or increased traffic. This portfolio MVP uses no paid API.
 
 Country geometry: [Natural Earth](https://www.naturalearthdata.com/), public domain, 1:50m Admin 0 countries, extracted from [the Natural Earth vector dataset](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_0_countries.geojson). The outline is a simplified overview, not a navigational or administrative boundary reference.
+
+## Supabase and ML extension
+
+RainWatch now optionally persists forecast snapshots and runs a forecast-correction experiment. The live weather dashboard remains available without Supabase or a trained model.
+
+### 1. Configure the project
+
+Create a Supabase project and install the [Supabase CLI](https://supabase.com/docs/guides/cli). Copy `.env.example` to `.env.local` and set the project URL, anon key, and service-role key. The service-role key must only be used by the Next.js server, CLI scripts, and Edge Function; never expose it to browser code.
+
+```bash
+cp .env.example .env.local
+supabase login
+supabase link --project-ref YOUR_PROJECT_REF
+```
+
+### 2. Apply the database migration
+
+The migration creates the five tables, indexes, uniqueness constraints, RLS defaults, and the ten supported Philippine locations. Push it from the repository root:
+
+```bash
+supabase db push
+```
+
+Verify the migration and seed in Supabase Studio under **Database → Tables**. `npm run db:seed` is intended for a local Supabase reset; it is not a production seed command.
+
+### 3. Deploy and configure ingestion
+
+Set the Edge Function's service-role secret, then deploy the function:
+
+```bash
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY="YOUR_SERVICE_ROLE_KEY"
+supabase functions deploy ingest-weather
+```
+
+`SUPABASE_URL` is supplied by Supabase at runtime. Test one invocation before scheduling it:
+
+```bash
+supabase functions invoke ingest-weather
+```
+
+Create the hourly schedule in the Supabase SQL Editor. Store the project URL and publishable/anon key in Vault; do not put the service-role key in this SQL. Supabase Cron invokes the Edge Function through `pg_net`, so no Vercel Cron job is needed.
+
+### Architecture and limitations
+
+Open-Meteo feeds both the live route and the hourly Edge Function. Supabase holds forecast snapshots, later historical-weather records, model versions, and model predictions. Python trains models offline; Next.js evaluates the portable artifact server-side and falls back to raw forecasts on any failure.
+
+The rainfall target is Open-Meteo historical-weather precipitation, a modeled historical-weather proxy rather than a local rain gauge. The experiment asks whether local statistical post-processing improves selected-location rainfall error; it does not predict flooding or independently simulate weather. Rainfall Stress remains a separate raw-forecast heuristic.
+
+Example Cron setup (replace placeholders after deploying the function):
+
+```sql
+select vault.create_secret('https://PROJECT_REF.supabase.co', 'project_url');
+select vault.create_secret('SUPABASE_PUBLISHABLE_KEY', 'publishable_key');
+select cron.schedule(
+  'rainwatch-hourly-ingestion', '5 * * * *',
+  $$ select net.http_post(
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/ingest-weather',
+    headers := jsonb_build_object('Content-Type','application/json','apikey',(select decrypted_secret from vault.decrypted_secrets where name = 'publishable_key')),
+    body := '{}'::jsonb
+  ); $$
+);
+```
+
+Check **Database → Cron → Run details** and the Edge Function logs after the first scheduled run. Re-running the function is safe: forecast snapshots, observations, and predictions use conflict-safe upserts.
+
+### 4. Train and promote a model
+
+The training workflow runs offline and needs the URL and service-role key from `.env.local` exported to the shell. It will refuse to train until at least 500 matched forecast/target rows exist.
+
+```bash
+cd ml
+python -m venv .venv
+source .venv/bin/activate             # Windows: .venv\\Scripts\\activate
+pip install -r requirements.txt
+
+export NEXT_PUBLIC_SUPABASE_URL="https://YOUR_PROJECT_REF.supabase.co"
+export SUPABASE_SERVICE_ROLE_KEY="YOUR_SERVICE_ROLE_KEY"
+python fetch_training_data.py          # writes ml/data/training.csv
+python train.py                        # writes ml/models/active-model.json/.joblib
+python evaluate.py                     # prints test comparison metrics
+python predict.py                      # uploads and activates the JSON artifact
+```
+
+Only run `predict.py` after reviewing the test metrics. It deactivates the previous model and inserts the selected model, feature contract, metrics, and portable artifact into `ml_models`; the Next.js server picks up the active version within its cache window. If no model is active, or inference fails, the dashboard continues showing raw Open-Meteo values.
