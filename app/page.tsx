@@ -1,4 +1,4 @@
-import { Dashboard } from "@/components/dashboard";
+import { Tanom } from "@/components/tanom";
 export default function Home() {
-  return <Dashboard />;
+  return <Tanom />;
 }

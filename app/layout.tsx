@@ -26,9 +26,9 @@ const plex = localFont({
   display: "swap",
 });
 export const metadata: Metadata = {
-  title: "RainWatch PH · Rainfall outlook",
+  title: "TANOM · Farm weather guidance",
   description:
-    "A transparent rainfall outlook for Philippine cities. Live forecasts, hourly rainfall, and an experimental rainfall stress indicator.",
+    "Weather, water, soil estimates and seasonal planning for Cebu growers.",
 };
 export default function RootLayout({
   children,
