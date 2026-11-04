@@ -24,10 +24,8 @@ test("TANOM live-data layout, map, matching, language, planning and accessible r
   await expect(page.locator("html")).toHaveAttribute("lang","ceb");
   await expect(page.locator(".heat .card-label")).toContainText("KAINIT");
   await page.locator(".language").click();
-  await page.getByLabel("Find a municipality").fill("Bogo");
   await page.getByLabel("Municipality / city", {exact:true}).selectOption({label:"City of Bogo"});
   await expect(page.locator(".location-heading h2")).toHaveText("City of Bogo");
-  await page.getByLabel("Find a municipality").fill("");
   await page.getByLabel("Municipality / city",{exact:true}).selectOption({label:"Dalaguete"});
   await page.evaluate(()=>document.fonts.ready);
   for(const width of [1440,768,390,320]){
@@ -71,4 +69,53 @@ test("GPS accepts Cebu, rejects out-of-region points, and reports timeout",async
  await page.evaluate(()=>Object.defineProperty(navigator,"geolocation",{configurable:true,value:{getCurrentPosition:(_ok:unknown,fail:(e:{code:number})=>void)=>fail({code:3})}}));
  await page.getByRole("button",{name:"Use my location"}).click();
  await expect(page.getByText("GPS timed out. You can still select a location manually.")).toBeVisible();
+});
+
+test("narrow overview stacks cards beside the map", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/");
+  await expect(page.locator(".condition-card")).toHaveCount(3);
+  for (const selector of [".tanom-brand small", ".cebu-badge", ".page-intro p", ".card-footnote"]) {
+    await expect(page.locator(selector)).toHaveCount(0);
+  }
+  await expect(page.getByRole("heading", { name: "Find your Farm" })).toBeVisible();
+  await expect(page.locator("#municipality-search")).toHaveCount(0);
+  await expect(page.locator(".map-panel").getByRole("button", { name: "Use my location" })).toBeVisible();
+  const column = await page.locator(".cards").boundingBox();
+  const panel = await page.locator(".map-panel").boundingBox();
+  expect(Math.abs(column!.y - panel!.y)).toBeLessThan(2);
+  expect(Math.abs(column!.height - panel!.height)).toBeLessThan(2);
+  await expect(page.locator(".map-panel .location-heading")).toBeVisible();
+  expect(await page.locator(".map-panel .locationbar").evaluate(el => Boolean(el.previousElementSibling?.classList.contains("cebu-map")))).toBe(true);
+  const main = await page.locator("main").boundingBox();
+  expect(main!.width).toBeCloseTo(1440 * .65, 0);
+  const cards = await page.locator(".cards").boundingBox();
+  const map = await page.locator(".map-panel").boundingBox();
+  expect(cards!.x + cards!.width).toBeLessThan(map!.x);
+  await page.locator(".language").click();
+  await expect(page.locator(".page-intro p")).toHaveCount(0);
+  for (const width of [768, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const left = await page.locator(".conditions-column").boundingBox();
+    const right = await page.locator(".map-panel").boundingBox();
+    expect(right!.y).toBeGreaterThanOrEqual(left!.y + left!.height);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
+
+test("bundled settlement dots select coordinates without a place API", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/");
+  const dot = page.locator(".settlement-dot").first();
+  await expect(dot).toBeVisible();
+  await expect(dot).toHaveAttribute("role", "button");
+  await dot.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".location-heading p")).toContainText("° N");
+  await expect(page.locator(".map-panel")).not.toContainText("90 m elevation model");
+  await expect(page.getByLabel("Find a municipality")).toHaveCount(0);
+  await page.getByLabel("Municipality / city", { exact: true }).selectOption({ label: "City of Bogo" });
+  await expect(page.locator(".location-heading h2")).toHaveText("City of Bogo");
+  await expect(page.locator(".settlement-dot").first()).toBeVisible();
 });

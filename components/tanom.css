@@ -21,3 +21,52 @@
 @media(max-width:760px){.tanom .tanom-header{padding:16px 18px}.tanom main{padding:0 18px}.tanom .tanom-brand{font-size:24px;gap:7px}.tanom .tanom-brand small{display:none}.tanom .cebu-badge{display:none}.tanom .intro{padding:28px 0;display:block}.tanom .intro h1{letter-spacing:-1px;font-size:40px}.tanom .intro-actions{display:none}.tanom .intro .eyeline{font-size:10px;letter-spacing:.8px}.tanom .locationbar{align-items:flex-start;flex-direction:column;padding:16px;gap:12px}.tanom .location-actions{flex-direction:row;align-items:center;width:100%;justify-content:space-between}.tanom .location-actions>span{font-size:11px;max-width:170px}.tanom .location-actions button{font-size:14px;padding:8px 10px}.tanom .cards{grid-template-columns:1fr;gap:12px}.tanom .condition-card{padding:20px}.tanom .card-value{font-size:42px}.tanom .condition-card h3{min-height:0}.tanom .card-top>svg{width:44px;height:44px}.tanom .card-bottom b{margin-left:auto}.tanom .workspace{grid-template-columns:1fr}.tanom .tanom-panel{padding:20px}.tanom .tanom-chart{height:280px}.tanom .cebu-map{height:350px}.tanom .checks{flex-wrap:wrap;padding:20px;gap:14px}.tanom .checks>div{flex:1;min-width:170px}.tanom .coming-soon{margin-left:0;max-width:none}.tanom .crop-grid{grid-template-columns:1fr 1fr}.tanom h2{font-size:24px}.tanom .season-tabs button{font-size:14px;flex:1;padding:8px}.tanom .section-title .eyeline{font-size:10px;letter-spacing:.9px}}
 @media(max-width:400px){.tanom .crop-grid{grid-template-columns:1fr}.tanom .intro h1{font-size:34px}.tanom .map-controls{display:flex;flex-direction:column}.tanom .map-controls label{align-self:flex-start}.tanom .header-right{gap:0}.tanom .condition-card{padding:16px}.tanom .card-value{font-size:36px}.tanom .season-tabs{flex-direction:column}.tanom .tanom-header{padding:16px}.tanom main{padding:0 12px}}
 @media(prefers-reduced-motion:reduce){.tanom .switch-thumb{transition:none}}
+/* Page navigation and shared page hierarchy */
+.tanom .page-nav{max-width:1440px;margin:0 auto;padding:0 32px;border-bottom:1px solid var(--line)}
+.tanom .page-nav>div{display:flex;gap:6px;overflow-x:auto;scrollbar-width:thin}
+.tanom .page-nav a{display:flex;align-items:center;min-height:52px;flex:none;padding:10px 14px;border-bottom:3px solid transparent;text-decoration:none;color:#425b68;font-size:15px;font-weight:600}
+.tanom .page-nav a:hover{color:var(--blue);background:#eaf0ef;text-decoration:none}
+.tanom .page-nav a[aria-current=page]{color:var(--blue);border-bottom-color:var(--blue)}
+.tanom .page-intro{padding:32px 0 24px}
+.tanom .page-intro h1{font-size:clamp(32px,3.5vw,46px);line-height:1.12;margin:8px 0;letter-spacing:-1px}
+.tanom .page-intro p:last-child{max-width:65ch;color:#425b68}
+.tanom .workspace-single{grid-template-columns:minmax(0,1fr)}
+.tanom .workspace-single .map-panel{max-width:900px;width:100%}
+.tanom .workspace{margin-bottom:28px}
+.tanom .tanom-panel+.cropsection{margin-top:28px}
+.tanom .tanom-panel>button{margin:16px 0}
+.tanom .tanom-panel>p[role=status]{margin-top:12px}
+@media(max-width:760px){.tanom .page-nav{padding:0 18px}.tanom .page-nav a{font-size:14px;padding:8px 12px}.tanom .page-intro{padding:24px 0}.tanom .page-intro h1{font-size:32px}.tanom .workspace-single .map-panel{max-width:none}}
+
+/* Narrow shared shell and home overview */
+.tanom .tanom-header,.tanom .page-nav{border:0}
+.tanom .page-nav>div{justify-content:safe center}
+.tanom .page-nav a{position:relative;border-bottom:0}
+.tanom .page-nav a:hover{background:transparent}
+.tanom .page-nav a::after{content:"";position:absolute;bottom:3px;left:14px;right:14px;height:2px;background:var(--blue);transform:scaleX(0);transition:transform .2s ease}
+.tanom .page-nav a:hover::after,.tanom .page-nav a:focus-visible::after,.tanom .page-nav a[aria-current=page]::after{transform:scaleX(1)}
+.tanom .conditions-column{min-width:0}
+.tanom .home-layout .cards{grid-template-columns:1fr}
+.tanom .home-map{grid-template-columns:minmax(0,1fr)}
+@media(min-width:1200px){
+.tanom .tanom-header,.tanom .page-nav,.tanom main{width:65%;max-width:none;padding-left:0;padding-right:0}
+.tanom .home-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:stretch}
+.tanom .home-layout .locationbar{flex-direction:column;align-items:stretch}
+.tanom .home-layout .location-actions{flex-wrap:wrap;justify-content:space-between}
+.tanom .home-layout .map-controls{display:flex;flex-direction:column}
+.tanom .home-layout .map-controls label{align-self:start}
+}
+@media(prefers-reduced-motion:reduce){.tanom .page-nav a::after{transition:none}}
+
+.tanom .map-controls{display:flex;flex-direction:column;gap:8px}
+.tanom .map-controls label{align-self:start}
+@media(min-width:1200px){
+.tanom .home-layout{align-items:stretch}
+.tanom .home-layout .conditions-column{display:flex;flex-direction:column}
+.tanom .home-layout .cards{flex:1;grid-auto-rows:1fr;margin-bottom:0}
+.tanom .home-map{display:flex;align-items:stretch;margin-bottom:0}
+.tanom .home-map .map-panel{display:flex;flex-direction:column;width:100%}
+.tanom .home-map .cebu-map{flex:1;min-height:330px}
+}
+
+.tanom .map-panel .locationbar{margin-top:16px;margin-bottom:0;flex-shrink:0}

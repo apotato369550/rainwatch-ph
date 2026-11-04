@@ -5,6 +5,7 @@ export const environmentSchema = z.object({
   fetchedAt: z.string(), observedAt: z.string(), latitude: z.number(), longitude: z.number(),
   temperature: value, maximum: value, precipitation: value, dailyRain: value,
   probability: value, weatherCode: value, soilMoisture: value, soilTemperature: value,
+  hourlySoil: z.array(z.object({time:z.string(),soilMoisture:value})).optional(),
   elevation: value, soilTime: z.string().nullable(), days: z.array(daySchema),
 });
 export const climateSchema = z.object({

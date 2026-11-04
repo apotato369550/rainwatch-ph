@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     const index = raw.hourly.time.findIndex(t=>t===Math.floor(raw.current.time/3600)*3600);
     const date = (t:number) => new Date((t+28800)*1000).toISOString().slice(0,10);
     return NextResponse.json({
+      hourlySoil:raw.hourly.time.map((t,i)=>({time:new Date(t*1000).toISOString(),soilMoisture:raw.hourly.soil_moisture_0_to_1cm[i]})),
       latitude:p.lat,longitude:p.lon,fetchedAt:new Date().toISOString(),observedAt:new Date(raw.current.time*1000).toISOString(),
       temperature:raw.current.temperature_2m,weatherCode:raw.current.weather_code,precipitation:raw.current.precipitation,
       maximum:raw.daily.temperature_2m_max[0],dailyRain:raw.daily.precipitation_sum[0],probability:raw.daily.precipitation_probability_max[0],
