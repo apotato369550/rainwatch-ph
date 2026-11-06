@@ -4,7 +4,7 @@ import { coordinates, badCoordinates, providerError, provider, common, nullable 
 const schema = z.object({
   elevation: nullable,
   current: z.object({time:z.number(),temperature_2m:nullable,precipitation:nullable,weather_code:nullable}),
-  hourly: z.object({time:z.array(z.number()),soil_moisture_0_to_1cm:z.array(nullable),soil_temperature_0cm:z.array(nullable)}).refine(h=>h.time.length===h.soil_moisture_0_to_1cm.length&&h.time.length===h.soil_temperature_0cm.length),
+  hourly: z.object({time:z.array(z.number()),soil_moisture_0_to_1cm:z.array(nullable),soil_temperature_0cm:z.array(nullable),temperature_2m:z.array(nullable),precipitation:z.array(nullable)}).refine(h=>h.time.length===h.soil_moisture_0_to_1cm.length&&Object.values(h).every(a=>a.length===h.time.length)),
   daily: z.object({time:z.array(z.number()),temperature_2m_max:z.array(nullable),precipitation_sum:z.array(nullable),precipitation_probability_max:z.array(nullable)}).refine(d=>Object.values(d).every(a=>a.length===d.time.length)&&d.time.length===7),
 });
 export async function GET(request: NextRequest) {
@@ -12,12 +12,13 @@ export async function GET(request: NextRequest) {
   try {
     const raw = schema.parse(await provider("https://api.open-meteo.com/v1/forecast",{
       ...common(p),timeformat:"unixtime",current:"temperature_2m,precipitation,weather_code",
-      hourly:"soil_moisture_0_to_1cm,soil_temperature_0cm",
+      hourly:"soil_moisture_0_to_1cm,soil_temperature_0cm,temperature_2m,precipitation",
       daily:"temperature_2m_max,precipitation_sum,precipitation_probability_max",forecast_days:"7",
     },600));
     const index = raw.hourly.time.findIndex(t=>t===Math.floor(raw.current.time/3600)*3600);
     const date = (t:number) => new Date((t+28800)*1000).toISOString().slice(0,10);
     return NextResponse.json({
+      hourlyConditions:raw.hourly.time.map((t,i)=>({time:new Date(t*1000).toISOString(),temperature:raw.hourly.temperature_2m[i],rainfall:raw.hourly.precipitation[i],soilMoisture:raw.hourly.soil_moisture_0_to_1cm[i]})),
       hourlySoil:raw.hourly.time.map((t,i)=>({time:new Date(t*1000).toISOString(),soilMoisture:raw.hourly.soil_moisture_0_to_1cm[i]})),
       latitude:p.lat,longitude:p.lon,fetchedAt:new Date().toISOString(),observedAt:new Date(raw.current.time*1000).toISOString(),
       temperature:raw.current.temperature_2m,weatherCode:raw.current.weather_code,precipitation:raw.current.precipitation,

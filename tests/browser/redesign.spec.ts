@@ -11,7 +11,7 @@ test("TANOM live-data layout, map, matching, language, planning and accessible r
   await page.setViewportSize({width:1440,height:1000});await page.goto("/");
   await expect(page.getByRole("heading",{name:"Dalaguete",exact:true})).toBeVisible();
   await expect(page.locator(".cebu-map .leaflet-interactive").first()).toBeVisible();
-  await expect(page.locator(".condition-card")).toHaveCount(3);
+  await expect(page.locator(".condition-card")).toHaveCount(4);
   await expect(page.locator(".language")).toHaveAttribute("aria-checked","false");
   await page.getByRole("heading",{name:"Crops to explore"}).scrollIntoViewIfNeeded();
   await expect(page.locator(".crop-card").first()).toBeVisible();
@@ -74,7 +74,7 @@ test("GPS accepts Cebu, rejects out-of-region points, and reports timeout",async
 test("narrow overview stacks cards beside the map", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
-  await expect(page.locator(".condition-card")).toHaveCount(3);
+  await expect(page.locator(".condition-card")).toHaveCount(4);
   for (const selector of [".tanom-brand small", ".cebu-badge", ".page-intro p", ".card-footnote"]) {
     await expect(page.locator(selector)).toHaveCount(0);
   }
@@ -118,4 +118,22 @@ test("bundled settlement dots select coordinates without a place API", async ({ 
   await page.getByLabel("Municipality / city", { exact: true }).selectOption({ label: "City of Bogo" });
   await expect(page.locator(".location-heading h2")).toHaveText("City of Bogo");
   await expect(page.locator(".settlement-dot").first()).toBeVisible();
+});
+
+test("four centered illustrated cards and simplified location panels",async({page})=>{
+  await page.goto("/");
+  await expect(page.locator(".condition-card")).toHaveCount(4);
+  await expect(page.locator(".condition-art")).toHaveCount(4);
+  for(const width of [1440,800,390]){
+    await page.setViewportSize({width,height:1000});
+    const boxes=await page.locator(".condition-card").evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y};}));
+    expect(boxes[0].y===boxes[1].y).toBe(width>=600);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+  for(const path of ["/","/conditions","/growing","/planning"]){
+    await page.goto(path);
+    await expect(page.locator(".terrain-context")).toHaveCount(0);
+    await expect(page.getByText(/Weather time:/)).toHaveCount(0);
+    await expect(page.getByText(/Click the land or a settlement dot/)).toHaveCount(0);
+  }
 });
