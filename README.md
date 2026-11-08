@@ -16,6 +16,7 @@ Open http://localhost:3000. The server needs internet access to Open-Meteo. Fore
 ```bash
 npm run typecheck
 npm run lint
+npm run format:check
 npm test
 npm run build
 npm start
@@ -192,3 +193,28 @@ python predict.py                      # uploads and activates the JSON artifact
 ```
 
 Only run `predict.py` after reviewing the test metrics. It deactivates the previous model and inserts the selected model, feature contract, metrics, and portable artifact into `ml_models`; the Next.js server picks up the active version within its cache window. If no model is active, or inference fails, the dashboard continues showing raw Open-Meteo values.
+
+### Environment analysis
+
+The Environment page (`/environment`; `/growing` redirects) generates analysis only
+on request. Set server-only `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` to enable
+it. Coordinates, modeled weather, historical climate and calculated crop matches
+are sent to OpenRouter. Missing climate falls back to weather-only analysis.
+Crop cards show EcoCrop tolerances; explicitly marked closest alternatives can
+exceed those tolerances and are not suitable-crop endorsements.
+
+The server uses `OPENROUTER_MAX_TOKENS=4096` by default (integer range
+2048–16384). This is a combined reasoning and visible-output budget, not a
+requested response length; the prompt asks for at most 250 words. A higher cap
+can increase cost. Truncated responses are rejected, not displayed as completed
+guidance, and are never retried automatically.
+
+Optionally set `OPENROUTER_REASONING_EFFORT` to a value supported by your chosen
+model: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
+Leave it blank to preserve provider defaults. Check the model's
+`reasoning.supported_efforts` in OpenRouter's models API; mandatory-reasoning
+models must not use `none`. For output-limit failures, try a supported lower
+effort or raise the bounded output budget, then restart/reload your existing
+server configuration. Sanitized server diagnostics include completion/reasoning
+token counts when supplied by the provider, never reasoning text.
+See [OpenRouter reasoning budgets](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).

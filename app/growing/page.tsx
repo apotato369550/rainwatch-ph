@@ -1,2 +1,4 @@
-import { Tanom } from "@/components/tanom";
-export default function Page(){return <Tanom page="growing"/>;}
+import { redirect } from "next/navigation";
+export default function Page() {
+  redirect("/environment");
+}

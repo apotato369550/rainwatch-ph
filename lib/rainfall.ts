@@ -156,7 +156,13 @@ export function summarizeWeather(
         : null,
     atmosphericFeatures,
     hourly,
-    mlForecast: { rawNext6h: sum(6), correctedNext6h: null, modelName: null, modelVersion: null, improvementKnown: false },
+    mlForecast: {
+      rawNext6h: sum(6),
+      correctedNext6h: null,
+      modelName: null,
+      modelVersion: null,
+      improvementKnown: false,
+    },
     ...calculateStress(
       sum(6),
       sum(24),

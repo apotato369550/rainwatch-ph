@@ -1,4 +1,5 @@
 # Cebu settlement points
+
 Source: GeoNames Philippines country extract, downloaded 2026-11-02.
 https://download.geonames.org/export/dump/PH.zip
 License: Creative Commons Attribution 4.0 (https://creativecommons.org/licenses/by/4.0/).

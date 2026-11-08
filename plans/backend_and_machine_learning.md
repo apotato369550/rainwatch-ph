@@ -15,9 +15,9 @@ Turn RainWatch PH from a live weather dashboard into a small real-time ML/data-s
 
 Keep everything deployable with:
 
-* Next.js on Vercel
-* Supabase
-* Python used only for offline/model training if necessary
+- Next.js on Vercel
+- Supabase
+- Python used only for offline/model training if necessary
 
 Do NOT add authentication.
 
@@ -168,11 +168,11 @@ ml/
 
 Use:
 
-* pandas
-* numpy
-* scikit-learn
-* joblib
-* optionally XGBoost if practical
+- pandas
+- numpy
+- scikit-learn
+- joblib
+- optionally XGBoost if practical
 
 Do not introduce TensorFlow/PyTorch.
 
@@ -335,13 +335,13 @@ Expose something similar to:
 
 ```ts
 interface RainfallPrediction {
-  rawForecast: number
-  correctedForecast: number | null
+  rawForecast: number;
+  correctedForecast: number | null;
 
-  modelName: string | null
-  modelVersion: string | null
+  modelName: string | null;
+  modelVersion: string | null;
 
-  improvementKnown: boolean
+  improvementKnown: boolean;
 }
 ```
 
@@ -544,14 +544,14 @@ RainWatch PH predicts or estimates **rainfall**, not flooding.
 
 Flooding also depends on:
 
-* drainage capacity
-* topography
-* waterways
-* tides
-* soil conditions
-* urbanization
-* infrastructure
-* previous rainfall
+- drainage capacity
+- topography
+- waterways
+- tides
+- soil conditions
+- urbanization
+- infrastructure
+- previous rainfall
 
 Avoid language implying causality.
 
@@ -604,14 +604,14 @@ Keep the system intentionally simple.
 
 Do not introduce:
 
-* Kubernetes
-* Docker orchestration
-* Kafka
-* Redis
-* microservices
-* dedicated Python servers
-* authentication
-* unnecessary queues
+- Kubernetes
+- Docker orchestration
+- Kafka
+- Redis
+- microservices
+- dedicated Python servers
+- authentication
+- unnecessary queues
 
 ---
 
