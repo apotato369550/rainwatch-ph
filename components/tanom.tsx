@@ -323,7 +323,7 @@ export function Tanom({ page = "home" }: { page?: string }) {
                 ceb={ceb}
               />
               <section
-                className="cropsection"
+                className="tanom-panel cropsection"
                 ref={planningRef}
                 aria-labelledby="crop-title"
               >
@@ -331,6 +331,12 @@ export function Tanom({ page = "home" }: { page?: string }) {
                   <h2 id="crop-title">
                     {t("Crops to Explore", "Mga tanom nga susihon")}
                   </h2>
+                  <p>
+                    {t(
+                      "Explore crops based on this location’s climate and elevation, and compare their growing needs.",
+                      "Susihon ang mga tanom base sa klima ug kahabogon niining dapita, ug itandi ang ilang mga kinahanglanon sa pagtubo.",
+                    )}
+                  </p>
                 </div>
                 {climate.loading && planning && (
                   <p className="status-note" role="status">

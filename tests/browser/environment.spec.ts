@@ -28,6 +28,25 @@ test("Environment redirects, shows tolerance cards and generates analysis on dem
     page.getByRole("heading", { name: "Environment", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".crop-card").first()).toBeVisible();
+  const crops = page.getByRole("region", { name: "Crops to Explore" });
+  await expect(crops).toHaveClass("tanom-panel cropsection");
+  await expect(crops.locator(".crop-title-card p")).toHaveText(
+    "Explore crops based on this location’s climate and elevation, and compare their growing needs.",
+  );
+  await expect(crops).toHaveCSS("background-color", "rgb(255, 253, 247)");
+  for (const card of await crops.locator(".crop-card").all()) {
+    const background = await card.evaluate((el) => {
+      const style = getComputedStyle(el);
+      const probe = document.createElement("div");
+      probe.style.backgroundColor = style.getPropertyValue("--crop-bg");
+      el.appendChild(probe);
+      const expected = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return { actual: style.backgroundColor, expected };
+    });
+    expect(background.actual).toBe(background.expected);
+    expect(background.actual).not.toBe("rgb(255, 253, 247)");
+  }
   expect(await page.locator(".crop-card").count()).toBeGreaterThanOrEqual(2);
   expect(await page.locator(".crop-card").count()).toBeLessThanOrEqual(3);
   await expect(page.locator(".crop-card").first()).toContainText(
@@ -85,13 +104,18 @@ for (const count of [2, 3])
       await page.setViewportSize({ width: 1920, height: 1200 });
       await page.goto("/environment");
       await expect(page.locator(".crop-card")).toHaveCount(count);
-      await expect(page.locator(".environment-layout")).toHaveAttribute(
-        "data-fit",
-        "true",
+      await expect(page.locator(".environment-layout")).toHaveCSS(
+        "display",
+        "grid",
       );
       const picker = await page.locator(".map-panel").boundingBox();
-      const layout = await page.locator(".environment-layout").boundingBox();
-      expect(Math.abs(picker!.height - layout!.height)).toBeLessThan(2);
+      const cropPanel = await page.locator(".cropsection").boundingBox();
+      const analysisPanel = await page.locator(".analysis-panel").boundingBox();
+      expect(picker!.x).toBeGreaterThanOrEqual(cropPanel!.x + cropPanel!.width);
+      expect(cropPanel!.x).toBe(analysisPanel!.x);
+      expect(cropPanel!.y).toBeGreaterThanOrEqual(
+        analysisPanel!.y + analysisPanel!.height,
+      );
       await expect(page.locator(".crop-title-card")).not.toContainText(
         "GROW WITH",
       );

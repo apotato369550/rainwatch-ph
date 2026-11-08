@@ -1312,10 +1312,15 @@
   margin: 0;
 }
 .tanom .crop-title-card {
-  padding: 12px 18px;
+  padding: 0;
 }
 .tanom .crop-title-card h2 {
   margin: 0;
+}
+.tanom .crop-title-card p {
+  margin: 12px 0 0;
+  font-size: 16px;
+  color: #425b68;
 }
 .tanom .environment-layout .crop-grid {
   margin-top: 12px;
@@ -1402,12 +1407,14 @@
     align-self: start;
   }
   .tanom .environment-layout:not([data-fit="true"]) {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto auto;
     height: auto;
   }
-  .tanom .environment-layout:not([data-fit="true"]) > * {
-    width: 100%;
+  .tanom .environment-layout:not([data-fit="true"]) .analysis-content {
+    max-height: 360px;
+    overflow: auto;
+    overscroll-behavior: contain;
   }
 }
 @media (min-width: 1200px) {
