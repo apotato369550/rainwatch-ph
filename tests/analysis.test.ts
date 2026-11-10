@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 import { POST } from "../app/api/analysis/route";
+import { environmentContext } from "../lib/tanom/analysis-contract";
 import { defaultPoint } from "../lib/tanom/geography";
 import { environmentFixture, climateFixture } from "./browser/tanom-fixtures";
 test("analysis route validates context and handles upstream failures", async (t) => {
@@ -95,7 +96,10 @@ test("analysis route validates context and handles upstream failures", async (t)
       ],
     });
   };
-  const request = (body: unknown = { ...defaultPoint, ceb: false }) =>
+  const snapshot = environmentContext(environmentFixture(), climateFixture);
+  const request = (
+    body: unknown = { ...defaultPoint, ceb: false, context: snapshot },
+  ) =>
     POST(
       new NextRequest("http://localhost/api/analysis", {
         method: "POST",
@@ -110,9 +114,8 @@ test("analysis route validates context and handles upstream failures", async (t)
     assert.equal(body.model, "fixture-model");
     assert.ok(body.observedAt);
     const context = JSON.parse(sent!.messages[1].content);
-    assert.ok(context.climate);
-    assert.equal(context.weather.hourlyConditions, undefined);
-    assert.equal(context.weather.hourlySoil, undefined);
+    assert.ok(context.context.climate);
+    assert.equal(context.context.view, "environment");
     assert.ok(context.recommendations.length >= 2);
     assert.equal(typeof context.location.municipality, "string");
     assert.match(sent!.messages[0].content, /English/);
@@ -147,18 +150,30 @@ test("analysis route validates context and handles upstream failures", async (t)
     mode = "success";
   });
   await t.test("Cebuano prompt", async () => {
-    await request({ ...defaultPoint, ceb: true });
+    await request({ ...defaultPoint, ceb: true, context: snapshot });
     assert.match(sent!.messages[0].content, /Cebuano/);
   });
   await t.test("climate fallback", async () => {
-    mode = "climate-failure";
-    assert.equal((await request()).status, 200);
+    mode = "success";
+    assert.equal(
+      (
+        await request({
+          ...defaultPoint,
+          ceb: false,
+          context: environmentContext(environmentFixture(), null),
+        })
+      ).status,
+      200,
+    );
     const context = JSON.parse(sent!.messages[1].content);
-    assert.equal(context.climate, null);
+    assert.equal(context.context.climate, null);
     assert.equal(context.recommendations, null);
   });
   await t.test("invalid coordinates", async () => {
-    assert.equal((await request({ lat: 14.6, lon: 121 })).status, 400);
+    assert.equal(
+      (await request({ lat: 0, lon: 0, ceb: false, context: snapshot })).status,
+      400,
+    );
   });
   await t.test("missing config", async () => {
     delete process.env.OPENROUTER_API_KEY;
@@ -190,11 +205,7 @@ test("analysis route validates context and handles upstream failures", async (t)
       assert.equal(body.stage, "openrouter");
       assert.ok(!JSON.stringify(body).includes("private"));
     });
-  for (const [failure, code] of [
-    ["weather-failure", "WEATHER_UNAVAILABLE"],
-    ["weather-malformed", "WEATHER_INVALID"],
-    ["length", "AI_OUTPUT_LIMIT"],
-  ])
+  for (const [failure, code] of [["length", "AI_OUTPUT_LIMIT"]])
     await t.test(failure, async () => {
       mode = failure;
       assert.equal((await (await request()).json()).code, code);

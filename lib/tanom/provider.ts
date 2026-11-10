@@ -16,7 +16,7 @@ export function coordinates(request: NextRequest) {
 }
 export const badCoordinates = () =>
   NextResponse.json(
-    { error: "Select a land location within Cebu." },
+    { error: "Select a land location within the Philippines." },
     { status: 400 },
   );
 export const providerError = () =>

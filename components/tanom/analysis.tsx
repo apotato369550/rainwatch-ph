@@ -1,7 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import type { Point } from "@/lib/tanom/contracts";
-export function Analysis({ point, ceb }: { point: Point; ceb: boolean }) {
+import type { AnalysisRequest } from "@/lib/tanom/analysis-contract";
+export function Analysis({
+  request,
+  ceb,
+}: {
+  request: AnalysisRequest | null;
+  ceb: boolean;
+}) {
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -9,7 +15,7 @@ export function Analysis({ point, ceb }: { point: Point; ceb: boolean }) {
   useEffect(() => () => controller.current?.abort(), []);
   const t = (en: string, ce: string) => (ceb ? ce : en);
   async function generate() {
-    if (controller.current) return;
+    if (controller.current || !request) return;
     const active = new AbortController();
     controller.current = active;
     setBusy(true);
@@ -18,7 +24,7 @@ export function Analysis({ point, ceb }: { point: Point; ceb: boolean }) {
       const response = await fetch("/api/analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...point, ceb }),
+        body: JSON.stringify(request),
         signal: active.signal,
       });
       const body = await response.json();
@@ -120,7 +126,7 @@ export function Analysis({ point, ceb }: { point: Point; ceb: boolean }) {
           "Paghimo og konteksto sa panahon, klima ug mga tanom. Ipadala ang lokasyon ug datos ngadto sa OpenRouter; dili kini pagtimbang sa uma.",
         )}
       </p>
-      <button disabled={busy} onClick={generate}>
+      <button disabled={busy || !request} onClick={generate}>
         {busy
           ? t("Generating…", "Naghimo…")
           : error

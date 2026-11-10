@@ -1226,12 +1226,12 @@
   margin: 0;
   min-width: 0;
 }
-.environment-layout .crop-grid {
+.environment-panel .crop-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
 }
-.environment-layout .crop-card {
+.environment-panel .crop-card {
   display: flex;
   flex-direction: column;
   padding: 16px;
@@ -1293,7 +1293,7 @@
   }
 }
 @media (max-width: 599px) {
-  .environment-layout .crop-grid {
+  .environment-panel .crop-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1308,7 +1308,7 @@
 .tanom .analysis-panel .analysis-content {
   min-height: 0;
 }
-.tanom .environment-layout .cropsection {
+.tanom .environment-panel .cropsection {
   margin: 0;
 }
 .tanom .crop-title-card {
@@ -1322,10 +1322,10 @@
   font-size: 16px;
   color: #425b68;
 }
-.tanom .environment-layout .crop-grid {
+.tanom .environment-panel .crop-grid {
   margin-top: 12px;
 }
-.tanom .environment-layout .crop-card {
+.tanom .environment-panel .crop-card {
   background: var(--crop-bg, #edf1e4);
   border-color: var(--crop-border, #a2b490);
 }
@@ -1356,7 +1356,7 @@
 .tanom .crop-tolerances .condition-art {
   margin: 0;
 }
-.tanom .environment-layout .crop-card .crop-info-button {
+.tanom .environment-panel .crop-card .crop-info-button {
   margin-top: auto;
   justify-content: center;
 }
@@ -1427,13 +1427,49 @@
   .tanom .environment-layout .plant-art {
     height: 80px;
   }
-  .tanom .environment-layout .crop-card h3 {
+  .tanom .environment-panel .crop-card h3 {
     font-size: 20px;
   }
-  .tanom .environment-layout .crop-tolerances {
+  .tanom .environment-panel .crop-tolerances {
     margin: 12px 0;
   }
-  .tanom .environment-layout .crop-tolerances > div {
+  .tanom .environment-panel .crop-tolerances > div {
     padding: 6px 0;
   }
 }
+
+/* One persistent dashboard shell; panel visibility never sizes the map. */
+.tanom .dashboard-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 24px;
+  align-items: start;
+}
+.tanom .dashboard-panels, .tanom .dashboard-panel { min-width: 0; }
+.tanom .dashboard-panel[hidden] { display: none; }
+.tanom .dashboard-panel:not([hidden]) { animation: dashboard-enter 200ms ease-out; }
+.tanom .dashboard-location { position: sticky; top: 24px; min-width: 0; }
+.tanom .dashboard-location .map-panel { height: auto; margin: 0; }
+.tanom .dashboard-location .cebu-map { height: clamp(240px, 40dvh, 400px); min-height: 0; }
+.tanom .environment-panel > * + * { margin-top: 24px; }
+.tanom .environment-panel .crop-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+@keyframes dashboard-enter {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@media (max-width: 1199px) {
+  .tanom .dashboard-layout { grid-template-columns: minmax(0, 1fr); }
+  .tanom .dashboard-location { position: static; grid-row: 1; }
+  .tanom .dashboard-location .cebu-map { height: 280px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanom .dashboard-panel:not([hidden]) { animation: none; }
+}
+.tanom .dashboard-panel .conditions-stack { height: auto; }
+.tanom .dashboard-panel .conditions-stack .tanom-chart { height: 320px; flex: none; }
+.tanom .dashboard-panel > .analysis-panel { margin-top: 24px; }
+.tanom .conditions-stack > .analysis-panel { margin-top: 14px; }
+.tanom .seasonal-graphs { display: grid; gap: 24px; margin-top: 24px; }
+.tanom .seasonal-graphs .condition-graph { margin: 0; }
+.tanom .seasonal-graphs .tanom-chart { height: 280px; }
+.tanom .dashboard-panel .conditions-stack { display: flex; flex-direction: column; }

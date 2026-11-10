@@ -27,10 +27,10 @@ test("TANOM live-data layout, map, matching, language, planning and accessible r
     page.getByRole("heading", { name: "Dalaguete", exact: true }),
   ).toBeVisible();
   await expect(
-    page.locator(".cebu-map .leaflet-interactive").first(),
+    page.locator(".cebu-map .leaflet-interactive:visible").first(),
   ).toBeVisible();
   await expect(page.locator(".condition-card")).toHaveCount(4);
-  await expect(page.locator(".language")).toHaveAttribute(
+  await expect(page.locator(".tanom-header .language")).toHaveAttribute(
     "aria-checked",
     "false",
   );
@@ -43,19 +43,16 @@ test("TANOM live-data layout, map, matching, language, planning and accessible r
   await page
     .getByRole("button", { name: "Annual climate profile", exact: true })
     .click();
-  await expect(
-    page.getByRole("heading", {
-      name: "Historical climate profile—not a forecast",
-    }),
-  ).toBeVisible();
-  await expect(page.locator(".monthly-summaries>div")).toHaveCount(12);
+  await expect(page.locator(".seasonal-graphs .condition-graph")).toHaveCount(2);
+  await expect(page.locator(".season-tabs button")).toHaveCount(2);
+  await expect(page.locator(".monthly-summaries")).toHaveCount(0);
   await page.getByRole("button", { name: "6 months", exact: true }).click();
-  await expect(page.locator(".monthly-summaries>div")).toHaveCount(6);
+  await expect(page.getByRole("button", {name:"6 months",exact:true})).toHaveAttribute("aria-pressed","true");
   await page.goto("/");
-  await page.locator(".language").click();
+  await page.locator(".tanom-header .language").click();
   await expect(page.locator("html")).toHaveAttribute("lang", "ceb");
-  await expect(page.locator(".heat .card-label")).toContainText("KAINIT");
-  await page.locator(".language").click();
+  await expect(page.locator(".heat .card-label")).toContainText("Kainit");
+  await page.locator(".tanom-header .language").click();
   await page
     .getByLabel("Municipality / city", { exact: true })
     .selectOption({ label: "City of Bogo" });
@@ -96,7 +93,7 @@ for (const [name, code] of [
         "Unavailable",
       );
       await expect(page.locator(".heat h3")).toHaveText(
-        code === 3 ? "Cloudy skies" : code === 61 ? "Rainfall" : "Thunderstorm",
+        code === 3 ? "Cloudy" : code === 61 ? "Rainfall" : "Thunderstorm",
       );
     },
   );
@@ -165,11 +162,16 @@ test("GPS accepts Cebu, rejects out-of-region points, and reports timeout", asyn
   await page.getByRole("button", { name: "Use my location" }).click();
   await expect(page.locator(".location-heading h2")).toHaveText("Cebu City");
   await expect(page.locator(".location-heading")).toContainText("±20 m");
-  await context.setGeolocation({ latitude: 14.6, longitude: 121 });
+  await page.evaluate(() => Object.defineProperty(navigator, "geolocation", {
+    configurable: true,
+    value: { getCurrentPosition: (ok: (position: unknown) => void) => ok({
+      coords: { latitude: 0, longitude: 0, accuracy: 20 }
+    }) }
+  }));
   await page.getByRole("button", { name: "Use my location" }).click();
   await expect(
     page.getByText(
-      "This location is outside Cebu land boundaries. Choose your farm on the map.",
+      "This location is outside Philippine land boundaries. Choose your farm on the map.",
     ),
   ).toBeVisible();
   await page.evaluate(() =>
@@ -211,7 +213,7 @@ test("narrow overview stacks cards beside the map", async ({ page }) => {
   const column = await page.locator(".cards").boundingBox();
   const panel = await page.locator(".map-panel").boundingBox();
   expect(Math.abs(column!.y - panel!.y)).toBeLessThan(2);
-  expect(Math.abs(column!.height - panel!.height)).toBeLessThan(2);
+  expect(panel!.width).toBe(420);
   await expect(page.locator(".map-panel .location-heading")).toBeVisible();
   expect(
     await page
@@ -225,13 +227,13 @@ test("narrow overview stacks cards beside the map", async ({ page }) => {
   const cards = await page.locator(".cards").boundingBox();
   const map = await page.locator(".map-panel").boundingBox();
   expect(cards!.x + cards!.width).toBeLessThan(map!.x);
-  await page.locator(".language").click();
+  await page.locator(".tanom-header .language").click();
   await expect(page.locator(".page-intro p")).toHaveCount(0);
   for (const width of [768, 390]) {
     await page.setViewportSize({ width, height: 1000 });
-    const left = await page.locator(".conditions-column").boundingBox();
+    const left = await page.locator(".dashboard-panels").boundingBox();
     const right = await page.locator(".map-panel").boundingBox();
-    expect(right!.y).toBeGreaterThanOrEqual(left!.y + left!.height);
+    expect(left!.y).toBeGreaterThanOrEqual(right!.y + right!.height);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,

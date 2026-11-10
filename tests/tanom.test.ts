@@ -10,15 +10,15 @@ import {
 import { monthly, normals, weatherKind } from "../lib/tanom/calculations";
 import { cropMatches } from "../lib/tanom/crops";
 import { environmentSchema } from "../lib/tanom/contracts";
-test("Cebu includes all 53 municipalities and independent cities; excludes sea and Manila", () => {
-  assert.equal(municipalities.length, 53);
+test("Nationwide catalog contains all pinned municipalities and excludes foreign points", () => {
+  assert.equal(municipalities.length, 1647);
   assert.equal(findMunicipality(defaultPoint)?.properties.name, "Dalaguete");
   assert.equal(
     findMunicipality({ lat: 10.3157, lon: 123.8854 })?.properties.name,
     "Cebu City",
   );
-  assert.equal(findMunicipality({ lat: 14.6, lon: 121 }), undefined);
-  assert.equal(findMunicipality({ lat: 10, lon: 124.5 }), undefined);
+  assert.ok(findMunicipality({ lat: 14.6, lon: 121 }));
+  assert.equal(findMunicipality({ lat: 0, lon: 0 }), undefined);
   for (const f of municipalities)
     assert.ok(findMunicipality(representativePoint(f)), f.properties.name);
 });

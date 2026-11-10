@@ -28,7 +28,7 @@ const plex = localFont({
 export const metadata: Metadata = {
   title: "TANOM · Farm weather guidance",
   description:
-    "Weather, water, soil estimates and seasonal planning for Cebu growers.",
+    "Weather, water, soil estimates and seasonal planning for Philippine growers.",
 };
 export default function RootLayout({
   children,

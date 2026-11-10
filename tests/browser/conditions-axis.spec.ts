@@ -28,7 +28,7 @@ test("selected graph retains exactly one scale after repeated variable changes",
       for (let repeat = 0; repeat < 2; repeat++)
         for (const [name, max] of [
           ["Temperature", 50],
-          ["Rainfall", 10],
+          ["Rainfall", 20],
           ["Surface moisture", 1],
           ["Temperature", 50],
         ] as const) {
@@ -39,7 +39,7 @@ test("selected graph retains exactly one scale after repeated variable changes",
           await expect
             .poll(async () => {
               const ticks = await graph
-                .locator(".recharts-yAxis .recharts-cartesian-axis-tick-value")
+                .locator(".recharts-yAxis-tick-labels .recharts-cartesian-axis-tick-value")
                 .allTextContents();
               return (
                 ticks.length > 0 && ticks.every((tick) => Number(tick) <= max)
@@ -47,7 +47,7 @@ test("selected graph retains exactly one scale after repeated variable changes",
             })
             .toBe(true);
           const boxes = await graph
-            .locator(".recharts-yAxis .recharts-cartesian-axis-tick-value")
+            .locator(".recharts-yAxis-tick-labels .recharts-cartesian-axis-tick-value")
             .evaluateAll((nodes) =>
               nodes
                 .map((node) => {

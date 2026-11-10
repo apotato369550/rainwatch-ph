@@ -4,15 +4,15 @@ test("legacy rainfall API rejects invalid locations", async ({ request }) => {
     400,
   );
 });
-test("environment endpoints reject absent, sea and outside-Cebu coordinates", async ({
+test("environment endpoints reject absent, sea and outside-Philippines coordinates", async ({
   request,
 }) => {
   for (const route of ["environment", "outlook", "climate-profile"])
     for (const query of [
       "",
       "?lat=NaN&lon=123",
-      "?lat=10&lon=124.5",
-      "?lat=14.6&lon=121",
+      "?lat=10&lon=140",
+      "?lat=0&lon=0",
     ]) {
       expect((await request.get("/api/" + route + query)).status()).toBe(400);
     }

@@ -3,15 +3,17 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import type { FeatureCollection } from "geojson";
 import places from "@/lib/tanom/cebu-places.json";
-import boundaries from "@/lib/tanom/cebu-boundaries.json";
+import { nationalBoundaries as boundaries, areas } from "@/lib/tanom/geography";
 import { findMunicipality } from "@/lib/tanom/geography";
 import type { Point } from "@/lib/tanom/contracts";
 export default function TanomMap({
   point,
+  areaId,
   onSelect,
   ceb,
 }: {
   point: Point;
+  areaId: string;
   onSelect: (p: Point) => void;
   ceb: boolean;
 }) {
@@ -29,12 +31,12 @@ export default function TanomMap({
     const instance = L.map(container.current, {
       center: [10.35, 123.8],
       zoom: 8,
-      minZoom: 8,
+      minZoom: 5,
       maxZoom: 15,
       scrollWheelZoom: false,
     });
     map.current = instance;
-    const layer = L.geoJSON(boundaries as FeatureCollection, {
+    L.geoJSON(boundaries as unknown as FeatureCollection, {
       style: {
         color: "#47758a",
         weight: 1.4,
@@ -49,10 +51,12 @@ export default function TanomMap({
         });
       },
     }).addTo(instance);
-    instance.fitBounds(layer.getBounds(), { padding: [12, 12] });
-    instance.setMaxBounds(layer.getBounds().pad(0.25));
+    instance.setMaxBounds([
+      [4, 116],
+      [22, 128],
+    ]);
     instance.attributionControl.addAttribution(
-      '<a href="/cebu-boundaries-LICENSE.md">NAMRIA / PSA / OCHA · geoBoundaries</a>',
+      '<a href="/philippines-boundaries-LICENSE.md">NAMRIA / PSA / OCHA · geoBoundaries</a>',
     );
     instance.attributionControl.addAttribution(
       '<a href="/cebu-places-LICENSE.md">GeoNames · CC BY 4.0</a>',
@@ -76,6 +80,17 @@ export default function TanomMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
+    const area = areas.find((item) => item.id === areaId);
+    if (area && map.current)
+      map.current.fitBounds(
+        [
+          [area.bbox[1], area.bbox[0]],
+          [area.bbox[3], area.bbox[2]],
+        ],
+        { padding: [20, 20] },
+      );
+  }, [areaId]);
+  useEffect(() => {
     marker.current?.setLatLng([point.lat, point.lon]);
     if (
       map.current &&
@@ -91,10 +106,13 @@ export default function TanomMap({
       (f) => f.properties.id === municipalityId,
     );
     if (selected)
-      instance.fitBounds(L.geoJSON(selected as GeoJSON.Feature).getBounds(), {
-        padding: [20, 20],
-        maxZoom: 12,
-      });
+      instance.fitBounds(
+        L.geoJSON(selected as unknown as GeoJSON.Feature).getBounds(),
+        {
+          padding: [20, 20],
+          maxZoom: 12,
+        },
+      );
     const draw = () => {
       group.clearLayers();
       if (instance.getZoom() < 10) return;
@@ -151,8 +169,8 @@ export default function TanomMap({
       role="region"
       aria-label={
         ceb
-          ? "Mapa sa Cebu; gamita ang listahan alang sa keyboard"
-          : "Cebu map; use the municipality list for keyboard selection"
+          ? "Mapa sa Pilipinas; gamita ang listahan alang sa keyboard"
+          : "Philippines map; use the municipality list for keyboard selection"
       }
     />
   );

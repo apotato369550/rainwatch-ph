@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -9,69 +9,29 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { conditionRows } from "@/lib/tanom/view-data";
+import { Analysis } from "./analysis";
+import {
+  analysisRequest,
+  conditionsContext,
+} from "@/lib/tanom/analysis-contract";
+import type { Point } from "@/lib/tanom/contracts";
 import type { Environment } from "@/lib/tanom/contracts";
 export function Conditions({
   data,
   ceb,
+  point,
 }: {
   data: Environment | null;
   ceb: boolean;
+  point: Point;
 }) {
   const [hourly, setHourly] = useState(false);
   const [selected, setSelected] = useState(0);
   const id = useId();
   const stackRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const stack = stackRef.current;
-    const finder =
-      stack?.parentElement?.querySelector<HTMLElement>(".map-panel");
-    if (!stack || !finder) return;
-    const observer = new ResizeObserver(() =>
-      stack.style.setProperty(
-        "--finder-height",
-        finder.getBoundingClientRect().height + "px",
-      ),
-    );
-    observer.observe(finder);
-    return () => observer.disconnect();
-  }, []);
   const t = (en: string, ce: string) => (ceb ? ce : en);
-  const rows = hourly
-    ? (data?.hourlyConditions ?? [])
-        .filter(
-          (r) =>
-            Date.parse(r.time) >=
-            Math.floor(Date.parse(data?.observedAt ?? "") / 3600000) * 3600000,
-        )
-        .slice(0, 24)
-        .map((r) => ({
-          time: r.time,
-          temperature: r.temperature,
-          rainfall: r.rainfall,
-          soil: r.soilMoisture,
-        }))
-    : (data?.days ?? []).map((day) => {
-        const moisture = (
-          data?.hourlyConditions ??
-          data?.hourlySoil ??
-          []
-        ).filter(
-          (r) =>
-            new Date(Date.parse(r.time) + 28800000)
-              .toISOString()
-              .slice(0, 10) === day.date,
-        );
-        return {
-          time: day.date + "T00:00:00+08:00",
-          temperature: day.heat,
-          rainfall: day.rain,
-          soil:
-            moisture.length === 24 &&
-            moisture.every((r) => r.soilMoisture !== null)
-              ? moisture.reduce((sum, r) => sum + r.soilMoisture!, 0) / 24
-              : null,
-        };
-      });
+  const rows = conditionRows(data, hourly);
   const dateLabel = (value: string, full = false) =>
     new Date(value).toLocaleString(ceb ? "ceb-PH" : "en-PH", {
       timeZone: "Asia/Manila",
@@ -119,6 +79,15 @@ export function Conditions({
     t("Rainfall", "Ulan"),
     t("Surface moisture", "Kaumog sa nawong"),
   ];
+  const request = analysisRequest(
+    point,
+    ceb,
+    conditionsContext(
+      data,
+      hourly,
+      s.key as "temperature" | "rainfall" | "soil",
+    ),
+  );
   return (
     <div ref={stackRef} className="conditions-stack">
       <section className="tanom-panel">
@@ -245,6 +214,7 @@ export function Conditions({
           )}
         </div>
       </section>
+      <Analysis key={JSON.stringify(request)} request={request} ceb={ceb} />
     </div>
   );
 }

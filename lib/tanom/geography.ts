@@ -1,8 +1,16 @@
-import boundaries from "./cebu-boundaries.json";
+import boundaries from "./national-boundaries.json";
+import catalog from "./location-catalog.json";
 import type { Point } from "./contracts";
 type Ring = number[][];
 type Geometry = { type: string; coordinates: unknown };
 export const municipalities = boundaries.features;
+export const areas = catalog.areas;
+export const locationCatalog = catalog.municipalities;
+export const nationalBoundaries = boundaries;
+export function areaFor(point: Point) {
+  const feature = findMunicipality(point);
+  return areas.find((area) => area.id === feature?.properties.areaId);
+}
 function onSegment(x: number, y: number, a: number[], b: number[]) {
   return (
     Math.abs((y - a[1]) * (b[0] - a[0]) - (x - a[0]) * (b[1] - a[1])) < 1e-10 &&
@@ -37,11 +45,22 @@ export function inGeometry(point: Point, geometry: Geometry) {
 export function findMunicipality(point: Point) {
   if (!Number.isFinite(point.lat) || !Number.isFinite(point.lon))
     return undefined;
-  return municipalities.find((f) => inGeometry(point, f.geometry));
+  return municipalities.find(
+    (f) =>
+      point.lon >= f.bbox[0] &&
+      point.lat >= f.bbox[1] &&
+      point.lon <= f.bbox[2] &&
+      point.lat <= f.bbox[3] &&
+      inGeometry(point, f.geometry),
+  );
 }
 export function representativePoint(
   feature: (typeof municipalities)[number],
 ): Point {
+  const saved = locationCatalog.find(
+    (item) => item.id === feature.properties.id,
+  );
+  if (saved) return saved.point;
   const polygons = (
     feature.geometry.type === "Polygon"
       ? [feature.geometry.coordinates]

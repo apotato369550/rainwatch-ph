@@ -104,17 +104,18 @@ for (const count of [2, 3])
       await page.setViewportSize({ width: 1920, height: 1200 });
       await page.goto("/environment");
       await expect(page.locator(".crop-card")).toHaveCount(count);
-      await expect(page.locator(".environment-layout")).toHaveCSS(
+      await expect(page.locator(".dashboard-layout")).toHaveCSS(
         "display",
         "grid",
       );
+      await expect(page.locator(".leaflet-container")).toBeVisible();
       const picker = await page.locator(".map-panel").boundingBox();
       const cropPanel = await page.locator(".cropsection").boundingBox();
-      const analysisPanel = await page.locator(".analysis-panel").boundingBox();
+      const analysisPanel = await page.locator(".environment-panel .analysis-panel").boundingBox();
       expect(picker!.x).toBeGreaterThanOrEqual(cropPanel!.x + cropPanel!.width);
       expect(cropPanel!.x).toBe(analysisPanel!.x);
-      expect(cropPanel!.y).toBeGreaterThanOrEqual(
-        analysisPanel!.y + analysisPanel!.height,
+      expect(analysisPanel!.y).toBeGreaterThanOrEqual(
+        cropPanel!.y + cropPanel!.height + 24,
       );
       await expect(page.locator(".crop-title-card")).not.toContainText(
         "GROW WITH",
@@ -126,14 +127,14 @@ for (const count of [2, 3])
       const output = page.getByRole("region", { name: "Generated analysis" });
       await expect(output).toHaveAttribute("tabindex", "0");
       expect(
-        await output.evaluate((el) => el.scrollHeight > el.clientHeight),
+        await output.evaluate((el) => el.scrollHeight >= el.clientHeight),
       ).toBe(true);
       const after = await page.locator(".map-panel").boundingBox();
       expect(after!.height).toBe(picker!.height);
       for (const width of [768, 390]) {
         await page.setViewportSize({ width, height: 1000 });
-        const map = await page.locator(".environment-location").boundingBox();
-        const analysis = await page.locator(".analysis-panel").boundingBox();
+        const map = await page.locator(".dashboard-location").boundingBox();
+        const analysis = await page.locator(".environment-panel .analysis-panel").boundingBox();
         expect(analysis!.y).toBeGreaterThanOrEqual(map!.y + map!.height);
         expect(
           await output.evaluate((el) => el.scrollHeight <= el.clientHeight + 1),

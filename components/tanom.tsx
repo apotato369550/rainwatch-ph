@@ -11,13 +11,30 @@ import {
 import { defaultPoint, findMunicipality } from "@/lib/tanom/geography";
 import { cropRecommendations } from "@/lib/tanom/crops";
 import { useResource } from "./tanom-hooks";
-import { TanomChart } from "./tanom-chart";
+import { SeasonalGraphs } from "./tanom/seasonal-graphs";
+import {
+  analysisRequest,
+  dashboardContext,
+  environmentContext,
+  seasonalContext,
+} from "@/lib/tanom/analysis-contract";
+import { seasonalRows } from "@/lib/tanom/view-data";
 import "./tanom.css";
 import { ConditionCards } from "./tanom/condition-cards";
 import { Analysis } from "./tanom/analysis";
-import { EnvironmentLayout } from "./tanom/environment-layout";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { CropCard } from "./tanom/crop-card";
-export function Tanom({ page = "home" }: { page?: string }) {
+type DashboardSection = "home" | "conditions" | "growing" | "planning" | "ml";
+const sections: Record<string, DashboardSection> = {
+  "/": "home",
+  "/conditions": "conditions",
+  "/environment": "growing",
+  "/planning": "planning",
+  "/ml": "ml",
+};
+export function Tanom() {
+  const page = sections[usePathname()] ?? "home";
   const [ceb, setCeb] = useState(false);
   const [point, setPoint] = useState<Point>(defaultPoint);
   const [gpsState, setGpsState] = useState<
@@ -27,27 +44,16 @@ export function Tanom({ page = "home" }: { page?: string }) {
   const [planning, setPlanning] = useState(
     page === "planning" || page === "growing",
   );
-  const [tab, setTab] = useState<"3" | "6" | "annual">("3");
-  const planningRef = useRef<HTMLElement>(null);
+  const [tab, setTab] = useState<"6" | "annual">("6");
+  const [outlookEnabled, setOutlookEnabled] = useState(page === "planning");
   const gpsRequest = useRef(0);
   const t = (en: string, ce: string) => (ceb ? ce : en);
   useEffect(() => {
     document.documentElement.lang = ceb ? "ceb" : "en";
   }, [ceb]);
-  useEffect(() => {
-    if (!planningRef.current) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setPlanning(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: "250px" },
-    );
-    observer.observe(planningRef.current);
-    return () => observer.disconnect();
-  }, []);
+  if (!planning && (page === "planning" || page === "growing"))
+    setPlanning(true);
+  if (!outlookEnabled && page === "planning") setOutlookEnabled(true);
   useEffect(
     () => () => {
       gpsRequest.current++;
@@ -68,17 +74,11 @@ export function Tanom({ page = "home" }: { page?: string }) {
     climateSchema,
   );
   const outlook = useResource(
-    page === "planning" && planning && tab !== "annual"
-      ? "/api/outlook?" + params
-      : null,
+    outlookEnabled ? "/api/outlook?" + params : null,
     climateSchema,
   );
   const data = environment.data;
   const matches = cropRecommendations(climate.data, data?.elevation ?? null);
-  const fmt = (n: number | null | undefined, digits = 1) =>
-    n === null || n === undefined
-      ? t("Unavailable", "Walay datos")
-      : n.toFixed(digits);
   const dateTime = (s: string) =>
     new Date(s).toLocaleString(ceb ? "ceb-PH" : "en-PH", {
       month: "short",
@@ -127,10 +127,7 @@ export function Tanom({ page = "home" }: { page?: string }) {
     );
   }
   const season = tab === "annual" ? climate : outlook;
-  const months = (season.data?.months ?? []).slice(
-    0,
-    tab === "annual" ? 12 : Number(tab),
-  );
+  const months = seasonalRows(season.data, tab);
   const gpsMessages = {
     idle: "",
     loading: t("Finding your location…", "Gipangita ang imong lokasyon…"),
@@ -139,8 +136,8 @@ export function Tanom({ page = "home" }: { page?: string }) {
       "Wala gitugotan ang GPS. Pagpili sa mapa o listahan.",
     ),
     outside: t(
-      "This location is outside Cebu land boundaries. Choose your farm on the map.",
-      "Ang lokasyon gawas sa Cebu. Pilia ang uma sa mapa.",
+      "This location is outside Philippine land boundaries. Choose your farm on the map.",
+      "Ang lokasyon gawas sa Pilipinas. Pilia ang uma sa mapa.",
     ),
     timeout: t(
       "GPS timed out. You can still select a location manually.",
@@ -218,20 +215,21 @@ export function Tanom({ page = "home" }: { page?: string }) {
             ],
             ["/ml", "ml", t("ML · Coming soon", "ML · Umaabot")],
           ].map(([href, id, label]) => (
-            <a
+            <Link
+              scroll={false}
               key={href}
               href={href}
               aria-current={page === id ? "page" : undefined}
             >
               {label}
-            </a>
+            </Link>
           ))}
         </div>
       </nav>
       <main id="farm">
         <section className="intro page-intro">
           <div>
-            <h1>
+            <h1 aria-live="polite" aria-atomic="true">
               {page === "home"
                 ? t("Dashboard", "Dashboard")
                 : page === "conditions"
@@ -275,56 +273,36 @@ export function Tanom({ page = "home" }: { page?: string }) {
             </button>
           </div>
         )}
-        <EnvironmentLayout enabled={page === "growing"}>
-          <div
-            className={
-              page === "home"
-                ? "home-layout"
-                : page === "growing"
-                  ? "environment-location"
-                  : undefined
-            }
-          >
-            <div className="conditions-column">
-              {page === "home" && (
-                <>
-                  <ConditionCards data={data} ceb={ceb} />
-                </>
-              )}
-            </div>
-            {page !== "ml" && (
-              <div
-                className={
-                  page === "conditions"
-                    ? "workspace"
-                    : page === "home"
-                      ? "workspace home-map"
-                      : "workspace workspace-single"
-                }
-              >
-                {page === "conditions" && <Conditions data={data} ceb={ceb} />}
-                <LocationFinder
-                  point={point}
-                  select={select}
-                  gps={gps}
-                  gpsState={gpsState}
-                  gpsMessage={gpsMessages[gpsState]}
-                  accuracy={accuracy}
-                  ceb={ceb}
-                />
-              </div>
-            )}
-          </div>
-          {page === "growing" && (
-            <>
+        <div className="dashboard-layout">
+          <div className="dashboard-panels">
+            <div
+              className="dashboard-panel"
+              hidden={page !== "home"}
+              data-section="home"
+            >
+              <ConditionCards data={data} ceb={ceb} />
               <Analysis
-                key={`${point.lat},${point.lon},${ceb}`}
-                point={point}
+                key={JSON.stringify(
+                  analysisRequest(point, ceb, dashboardContext(data)),
+                )}
+                request={analysisRequest(point, ceb, dashboardContext(data))}
                 ceb={ceb}
               />
+            </div>
+            <div
+              className="dashboard-panel"
+              hidden={page !== "conditions"}
+              data-section="conditions"
+            >
+              <Conditions data={data} ceb={ceb} point={point} />
+            </div>
+            <div
+              className="dashboard-panel environment-panel"
+              hidden={page !== "growing"}
+              data-section="growing"
+            >
               <section
                 className="tanom-panel cropsection"
-                ref={planningRef}
                 aria-labelledby="crop-title"
               >
                 <div className="crop-title-card">
@@ -388,136 +366,140 @@ export function Tanom({ page = "home" }: { page?: string }) {
                   )}
                 </p>
               </section>
-            </>
-          )}
-        </EnvironmentLayout>
-        {page === "planning" && (
-          <section className="tanom-panel season">
-            <div className="section-title">
-              <div>
-                <p className="eyeline">
-                  {t("LOOK A LITTLE FURTHER", "TAN-AW SA UMAABOT")}
-                </p>
-                <h2>{t("Seasonal planning", "Plano sa panahon")}</h2>
-              </div>
-              <CalendarDays size={28} aria-hidden="true" />
+              <Analysis
+                key={JSON.stringify(
+                  analysisRequest(
+                    point,
+                    ceb,
+                    environmentContext(data, climate.data),
+                  ),
+                )}
+                request={analysisRequest(
+                  point,
+                  ceb,
+                  environmentContext(data, climate.data),
+                )}
+                ceb={ceb}
+              />
             </div>
             <div
-              className="season-tabs"
-              role="group"
-              aria-label={t("Planning period", "Gidugayon sa plano")}
+              className="dashboard-panel"
+              hidden={page !== "planning"}
+              data-section="planning"
             >
-              {(["3", "6", "annual"] as const).map((value) => (
-                <button
-                  key={value}
-                  aria-pressed={tab === value}
-                  onClick={() => {
-                    setPlanning(true);
-                    setTab(value);
-                  }}
+              <section className="tanom-panel season">
+                <div className="section-title">
+                  <div>
+                    <p className="eyeline">
+                      {t("LOOK A LITTLE FURTHER", "TAN-AW SA UMAABOT")}
+                    </p>
+                    <h2>{t("Seasonal planning", "Plano sa panahon")}</h2>
+                  </div>
+                  <CalendarDays size={28} aria-hidden="true" />
+                </div>
+                <div
+                  className="season-tabs"
+                  role="group"
+                  aria-label={t("Planning period", "Gidugayon sa plano")}
                 >
-                  {value === "annual"
-                    ? t("Annual climate profile", "Tinuig nga klima")
-                    : value + " " + t("months", "ka bulan")}
-                  <ChevronRight size={16} aria-hidden="true" />
-                </button>
-              ))}
-            </div>
-            <h3>
-              {tab === "annual"
-                ? t(
-                    "Historical climate profile—not a forecast",
-                    "Kasaysayan sa klima—dili forecast",
-                  )
-                : t("Regional seasonal outlook", "Rehiyonal nga forecast")}
-            </h3>
-            <p>
-              {tab === "annual"
-                ? t(
-                    "1991–2020 ERA5 averages: monthly mean temperature and average monthly rainfall totals.",
-                    "1991–2020 ERA5: kasagarang temperatura ug kinatibuk-ang ulan matag bulan.",
-                  )
-                : t(
-                    "ECMWF SEAS5 ensemble mean. Approximately 36 km resolution; not bias-corrected. Regional estimates, not precise farm predictions.",
-                    "ECMWF SEAS5 ensemble mean. Mga 36 km; dili bias-corrected. Rehiyonal, dili tukma nga forecast sa uma.",
-                  )}
-            </p>
-            {season.loading && planning && (
-              <p className="status-note" role="status">
-                {t("Loading planning data…", "Gikarga ang datos sa plano…")}
-              </p>
-            )}
-            {season.error && (
-              <div className="status-note error-note" role="alert">
-                <p>
-                  {t(
-                    "Planning data is unavailable. Current weather is unaffected.",
-                    "Walay datos sa plano. Dili apektado ang panahon karon.",
-                  )}
-                </p>
-                <button onClick={season.retry}>
-                  {t("Retry", "Sulayi pag-usab")}
-                </button>
-              </div>
-            )}
-            {months.length > 0 && (
-              <>
-                <TanomChart
-                  rows={months.map((m) => ({
-                    ...m,
-                    date: m.date.length === 7 ? m.date + "-01" : m.date,
-                  }))}
-                  ceb={ceb}
-                  monthly
-                />
-                <div className="monthly-summaries">
-                  {months.map((m) => (
-                    <div key={m.date}>
-                      <strong>
-                        {new Date(
-                          m.date + "-01T00:00:00+08:00",
-                        ).toLocaleDateString(ceb ? "ceb-PH" : "en-PH", {
-                          month: "short",
-                          ...(tab === "annual" ? {} : { year: "numeric" }),
-                          timeZone: "Asia/Manila",
-                        })}
-                      </strong>
-                      <span>{fmt(m.heat)} °C</span>
-                      <span>{fmt(m.rain, 0)} mm</span>
-                      {m.partial && (
-                        <small>
-                          {t("Partial month", "Dili kompleto nga bulan")}
-                        </small>
-                      )}
-                    </div>
+                  {(["6", "annual"] as const).map((value) => (
+                    <button
+                      key={value}
+                      aria-pressed={tab === value}
+                      onClick={() => {
+                        setPlanning(true);
+                        setTab(value);
+                      }}
+                    >
+                      {value === "annual"
+                        ? t("Annual climate profile", "Tinuig nga klima")
+                        : value + " " + t("months", "ka bulan")}
+                      <ChevronRight size={16} aria-hidden="true" />
+                    </button>
                   ))}
                 </div>
-                <p className="microcopy">
-                  {season.data?.source} · {t("Retrieved", "Gikuha")}:{" "}
-                  {season.data && dateTime(season.data.fetchedAt)} PHT
+                {season.loading && planning && (
+                  <p className="status-note" role="status">
+                    {t("Loading planning data…", "Gikarga ang datos sa plano…")}
+                  </p>
+                )}
+                {season.error && (
+                  <div className="status-note error-note" role="alert">
+                    <p>
+                      {t(
+                        "Planning data is unavailable. Current weather is unaffected.",
+                        "Walay datos sa plano. Dili apektado ang panahon karon.",
+                      )}
+                    </p>
+                    <button onClick={season.retry}>
+                      {t("Retry", "Sulayi pag-usab")}
+                    </button>
+                  </div>
+                )}
+                {months.length > 0 && (
+                  <>
+                    <SeasonalGraphs rows={months} ceb={ceb} />
+                    <p className="microcopy">
+                      {season.data?.source} · {t("Retrieved", "Gikuha")}:{" "}
+                      {season.data && dateTime(season.data.fetchedAt)} PHT
+                    </p>
+                  </>
+                )}
+                <p className="limitations">
+                  <Info size={18} aria-hidden="true" />
+                  {tab === "annual"
+                    ? t(
+                        "1991–2020 ERA5 historical climate profile, not a forecast or local weather-station record.",
+                        "Ang reanalysis modelo sa kasaysayan, dili lokal nga weather station.",
+                      )
+                    : t(
+                        "ECMWF SEAS5 regional ensemble mean, approximately 36 km resolution, not bias-corrected. Long-range forecasts are uncertain. No farm-level confidence or above/below-normal claims are inferred. Partial months are labeled, not extrapolated.",
+                        "Dili sigurado ang dugay nga forecast. Ang kulang nga bulan gimarkahan ug wala gipuno.",
+                      )}
                 </p>
-              </>
-            )}
-            <p className="limitations">
-              <Info size={18} aria-hidden="true" />
-              {tab === "annual"
-                ? t(
-                    "Reanalysis is modeled history, not a local weather-station record.",
-                    "Ang reanalysis modelo sa kasaysayan, dili lokal nga weather station.",
-                  )
-                : t(
-                    "Long-range forecasts are uncertain. No farm-level confidence or above/below-normal claims are inferred. Partial months are labeled, not extrapolated.",
-                    "Dili sigurado ang dugay nga forecast. Ang kulang nga bulan gimarkahan ug wala gipuno.",
-                  )}
-            </p>
-          </section>
-        )}
-        {page === "ml" && (
-          <section className="tanom-panel">
-            <h2>ML Weather Predictions</h2>
-            <p>Coming soon. No ML predictions are available yet.</p>
-          </section>
-        )}
+              </section>
+              <Analysis
+                key={JSON.stringify(
+                  analysisRequest(
+                    point,
+                    ceb,
+                    seasonalContext(season.data, tab),
+                  ),
+                )}
+                request={analysisRequest(
+                  point,
+                  ceb,
+                  seasonalContext(season.data, tab),
+                )}
+                ceb={ceb}
+              />
+            </div>
+            <div
+              className="dashboard-panel"
+              hidden={page !== "ml"}
+              data-section="ml"
+            >
+              <section className="tanom-panel">
+                <h2>ML Weather Predictions</h2>
+                <p>Coming soon. No ML predictions are available yet.</p>
+              </section>
+            </div>
+          </div>
+          <aside
+            className="dashboard-location"
+            aria-label={t("Farm location", "Lokasyon sa uma")}
+          >
+            <LocationFinder
+              point={point}
+              select={select}
+              gps={gps}
+              gpsState={gpsState}
+              gpsMessage={gpsMessages[gpsState]}
+              accuracy={accuracy}
+              ceb={ceb}
+            />
+          </aside>
+        </div>
         <footer className="tanom-footer">
           <svg
             width="48"
