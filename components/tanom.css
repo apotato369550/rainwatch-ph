@@ -1353,6 +1353,22 @@
   --crop-bg: #ebe9d9;
   --crop-border: #b1ad86;
 }
+.crop-card[data-crop="1574"] {
+  --crop-bg: #f1edda;
+  --crop-border: #bdb079;
+}
+.crop-card[data-crop="1265"] {
+  --crop-bg: #eee1e8;
+  --crop-border: #bb99aa;
+}
+.crop-card[data-crop="1420"] {
+  --crop-bg: #eee5d6;
+  --crop-border: #bba581;
+}
+.crop-card[data-crop="820"] {
+  --crop-bg: #f4e7d3;
+  --crop-border: #c4a16f;
+}
 .tanom .crop-tolerances .condition-art {
   margin: 0;
 }
@@ -1473,3 +1489,93 @@
 .tanom .seasonal-graphs .condition-graph { margin: 0; }
 .tanom .seasonal-graphs .tanom-chart { height: 280px; }
 .tanom .dashboard-panel .conditions-stack { display: flex; flex-direction: column; }
+
+/* Reports keep the dashboard's typography, with readable prose rather than raw markdown. */
+.tanom .analysis-panel .analysis-content,
+.tanom .analysis-panel .analysis-content p,
+.tanom .analysis-panel .analysis-content li {
+  font-size: 14px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.tanom .analysis-content p {
+  margin: 0 0 1em;
+  white-space: normal;
+}
+.tanom .analysis-content ul,
+.tanom .analysis-content ol {
+  margin: 0 0 1em;
+  padding-left: 1.5em;
+}
+.tanom .analysis-content li + li {
+  margin-top: 0.45em;
+}
+.tanom .analysis-provenance {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.tanom .insights-control {
+  margin-top: 16px;
+}
+.tanom .insights-control p {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 10px 0 0;
+}
+.tanom .insights-control button[aria-pressed="true"] {
+  background: #e8efdc;
+  color: #25472c;
+}
+.tanom .crop-carousel {
+  min-width: 0;
+  margin-top: 18px;
+}
+.tanom .crop-carousel-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.tanom .crop-carousel-controls button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.tanom .crop-carousel-controls button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.tanom .crop-carousel-track {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  padding: 4px 4px 16px;
+}
+.tanom .crop-carousel-slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.tanom .crop-carousel-slide .crop-card {
+  height: 100%;
+  width: min(100%, 320px);
+  margin-inline: auto;
+  box-sizing: border-box;
+  border-radius: 16px;
+  box-shadow: 0 3px 0 #45604433;
+}
+.tanom .crop-carousel-track:focus-visible {
+  outline: 3px solid #176080;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanom .crop-carousel-track {
+    scroll-behavior: auto;
+  }
+}

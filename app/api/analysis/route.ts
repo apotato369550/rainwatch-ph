@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findMunicipality } from "@/lib/tanom/geography";
 import { cropRecommendations } from "@/lib/tanom/crops";
-import { analysisRequestSchema } from "@/lib/tanom/analysis-contract";
-import { prompts, sharedPrompt } from "@/prompts";
+import { randomUUID } from "node:crypto";
+import {
+  parseSelection,
+  cacheKey,
+  reportTTL,
+  visitorHash,
+  isFreeModel,
+  systemPrompt,
+} from "@/lib/tanom/analysis-server";
+import { serverContext } from "@/lib/tanom/analysis-server-context";
+import { admit, finish, StorageError } from "@/lib/tanom/analysis-server-store";
+
+export const runtime = "nodejs";
+export const maxDuration = 120;
 export async function POST(request: NextRequest) {
   const started = Date.now();
   let stage = "request";
   let upstreamStatus: number | undefined;
+  let lease: { key: string; owner: string; ttl: number } | undefined;
 
   const fail = (error: string, code: string, status: number) => {
     // Never log credentials, coordinates, prompt content, or upstream error bodies.
@@ -16,30 +29,50 @@ export async function POST(request: NextRequest) {
       upstreamStatus,
       elapsedMs: Date.now() - started,
     });
-    return NextResponse.json({ error, code, stage }, { status });
+    return NextResponse.json(
+      { error, code, stage },
+      { status, headers: { "Cache-Control": "no-store" } },
+    );
   };
   try {
     let input;
     try {
-      const raw = await request.text();
-      if (raw.length > 100000)
+      if (Number(request.headers.get("content-length")) > 100000)
         return fail("Snapshot is too large.", "INVALID_REQUEST", 400);
-      input = JSON.parse(raw);
+      // Bound bytes while streaming, not after allocating an arbitrary public body.
+      const reader = request.body?.getReader();
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      if (reader) {
+        try {
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            size += value.byteLength;
+            if (size > 100000) {
+              await reader.cancel();
+              return fail("Snapshot is too large.", "INVALID_REQUEST", 400);
+            }
+            chunks.push(value);
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      }
+      input = JSON.parse(Buffer.concat(chunks).toString("utf8"));
     } catch {
       return fail("Send valid JSON coordinates.", "INVALID_REQUEST", 400);
     }
     if (!input || typeof input !== "object")
       return fail("Send valid JSON coordinates.", "INVALID_REQUEST", 400);
-    if (Number(request.headers.get("content-length")) > 100000)
-      return fail("Snapshot is too large.", "INVALID_REQUEST", 400);
-    const parsed = analysisRequestSchema.safeParse(input);
-    if (!parsed.success)
+    const parsed = parseSelection(input);
+    if (!parsed)
       return fail(
         "Send a valid bounded displayed snapshot.",
         "INVALID_REQUEST",
         400,
       );
-    const { lat, lon, ceb, context } = parsed.data;
+    const { lat, lon } = parsed;
     const municipality = findMunicipality({ lat, lon });
     if (!municipality)
       return fail("Select a Philippine land location.", "INVALID_REQUEST", 400);
@@ -52,6 +85,12 @@ export async function POST(request: NextRequest) {
             "Configure OPENROUTER_API_KEY and OPENROUTER_MODEL on the server.",
         },
         { status: 503 },
+      );
+    if (!isFreeModel(model))
+      return fail(
+        "Only openrouter/free or a :free model is allowed.",
+        "AI_CONFIG_INVALID",
+        503,
       );
     const rawBudget = process.env.OPENROUTER_MAX_TOKENS?.trim();
     const maxTokens = rawBudget ? Number(rawBudget) : 4096;
@@ -73,6 +112,56 @@ export async function POST(request: NextRequest) {
     }
     // Effort support differs by model. Only send it when explicitly configured.
     const reasoning = reasoningEffort ? { effort: reasoningEffort } : undefined;
+    stage = "admission";
+    let visitor: string;
+    try {
+      visitor = visitorHash(request.headers);
+    } catch {
+      return fail(
+        "Configure trusted proxy IP identity on the server.",
+        "AI_IDENTITY_UNAVAILABLE",
+        503,
+      );
+    }
+    const reportKey = cacheKey(parsed, model);
+    const owner = randomUUID();
+    const admission = await admit(reportKey, visitor, owner);
+    if (admission.status === "cached") {
+      return NextResponse.json(
+        {
+          ...admission.payload,
+          cached: true,
+          expiresAt: admission.expiresAt,
+          ageSeconds: Math.max(
+            0,
+            Math.floor(
+              (Date.now() - Date.parse(admission.payload.generatedAt)) / 1000,
+            ),
+          ),
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+    if (admission.status !== "allowed") {
+      const codes = {
+        burst: "AI_BURST_LIMIT",
+        site_quota: "AI_SITE_QUOTA",
+        visitor_quota: "AI_VISITOR_QUOTA",
+        busy: "AI_BUSY",
+      };
+      const messages = {
+        burst: "Too many analysis requests. Please retry later.",
+        site_quota:
+          "The site's daily AI allowance has been used. Try after 00:00 UTC.",
+        visitor_quota:
+          "This IP's daily AI allowance has been used. Try after 00:00 UTC.",
+        busy: "Analysis is already in progress. Please retry later.",
+      };
+      return fail(messages[admission.status], codes[admission.status], 429);
+    }
+    lease = { key: reportKey, owner, ttl: reportTTL(parsed) };
+    stage = "weather";
+    const context = await serverContext(parsed);
     const recommendations =
       context.view === "environment"
         ? cropRecommendations(context.climate, context.elevation)
@@ -89,17 +178,17 @@ export async function POST(request: NextRequest) {
         signal: AbortSignal.timeout(30000),
         body: JSON.stringify({
           model,
+          // Hard zero-price route; no paid/model/provider fallback or retry.
+          provider: {
+            allow_fallbacks: false,
+            max_price: { prompt: 0, completion: 0 },
+          },
           max_tokens: maxTokens,
           ...(reasoning ? { reasoning } : {}),
           messages: [
             {
               role: "system",
-              content:
-                sharedPrompt +
-                "\n" +
-                prompts[context.view] +
-                "\nLanguage: " +
-                (ceb ? "Cebuano" : "English"),
+              content: systemPrompt(parsed),
             },
             {
               role: "user",
@@ -173,6 +262,15 @@ export async function POST(request: NextRequest) {
         502,
       );
     }
+    // Text may accompany a provider error, tool call or filtered/incomplete turn.
+    // Only a completed plain-text response is eligible for durable caching.
+    if (body.error || body.choices?.[0]?.finish_reason !== "stop") {
+      return fail(
+        "AI provider did not complete the analysis. Please retry later.",
+        "AI_INCOMPLETE_OUTPUT",
+        502,
+      );
+    }
     if (typeof analysis !== "string" || !analysis.trim()) {
       return fail(
         "AI provider returned no analysis. Please retry or check the configured model.",
@@ -180,15 +278,32 @@ export async function POST(request: NextRequest) {
         502,
       );
     }
-    return NextResponse.json({
+    const report = {
       analysis,
       model,
       observedAt:
         "observedAt" in context
           ? context.observedAt
           : context.climate.fetchedAt,
-    });
+      generatedAt: new Date().toISOString(),
+      contextFetchedAt:
+        "fetchedAt" in context ? context.fetchedAt : context.climate.fetchedAt,
+    };
+    stage = "storage";
+    await finish(lease.key, lease.owner, report, lease.ttl);
+    const expiresAt = new Date(Date.now() + lease.ttl * 1000).toISOString();
+    lease = undefined;
+    return NextResponse.json(
+      { ...report, cached: false, ageSeconds: 0, expiresAt },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
+    if (error instanceof StorageError)
+      return fail(
+        "Analysis storage is unavailable. Please retry later.",
+        "AI_STORAGE_UNAVAILABLE",
+        503,
+      );
     const timeout =
       error instanceof Error &&
       (error.name === "TimeoutError" || error.name === "AbortError");
@@ -207,5 +322,18 @@ export async function POST(request: NextRequest) {
       stage === "weather" ? "WEATHER_INVALID" : "ANALYSIS_FAILED",
       502,
     );
+  } finally {
+    if (lease) {
+      // Failure releases only this owner's live lease; quota is never refunded.
+      // If storage is down the lease expires, preventing permanent deadlocks.
+      try {
+        await finish(lease.key, lease.owner, null, lease.ttl);
+      } catch {
+        console.error("[analysis]", {
+          stage: "storage",
+          code: "AI_LEASE_RELEASE_FAILED",
+        });
+      }
+    }
   }
 }

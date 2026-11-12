@@ -116,7 +116,7 @@ test("crop matches require complete climate and elevation; do not pad unsuitable
   assert.equal(cropMatches(profile, null), null);
   assert.equal(cropMatches(null, 100), null);
   const matches = cropMatches(profile, 100)!;
-  assert.ok(matches.length <= 5 && matches.length >= 3);
+  assert.ok(matches.length === 7);
   assert.ok(matches.every((m) => m.maxElevation >= 100));
   assert.equal(
     cropMatches(

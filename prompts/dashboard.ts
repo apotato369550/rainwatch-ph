@@ -1,2 +1,2 @@
 export const dashboardPrompt =
-  "Explain the displayed current dashboard readings, heat, rain and modeled surface soil context; do not invent future trends or crop recommendations.";
+  "Explain the displayed current dashboard readings, heat, rain and modeled surface soil context in everyday terms, focusing on what matters for today's field checks. Modeled surface soil moisture is not a measured field condition. Keep practical bullets to checking the displayed conditions and local observations; do not invent future trends or crop recommendations.";

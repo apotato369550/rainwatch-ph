@@ -79,6 +79,54 @@ export const crops: Crop[] = [
     absoluteRain: [500, 1250],
     maxElevation: 2000,
   },
+  // FAO EcoCrop datasheet 1574, verified 2026-11-12: https://ecocrop.apps.fao.org/ecocrop/srv/en/dataSheet?id=1574
+  {
+    id: 1574,
+    name: "Rice",
+    ceb: "Humay",
+    icon: "grain",
+    temp: [20, 30],
+    absoluteTemp: [10, 36],
+    rain: [1500, 2000],
+    absoluteRain: [1000, 4000],
+    maxElevation: 2500,
+  },
+  // FAO EcoCrop datasheet 1265, verified 2026-11-12: https://ecocrop.apps.fao.org/ecocrop/srv/en/dataSheet?id=1265
+  {
+    id: 1265,
+    name: "Sweet potato",
+    ceb: "Kamote",
+    icon: "leaf",
+    temp: [18, 28],
+    absoluteTemp: [10, 38],
+    rain: [750, 2000],
+    absoluteRain: [350, 5000],
+    maxElevation: 2800,
+  },
+  // FAO EcoCrop datasheet 1420, verified 2026-11-12: https://ecocrop.apps.fao.org/ecocrop/srv/en/dataSheet?id=1420
+  {
+    id: 1420,
+    name: "Cassava",
+    ceb: "Balanghoy",
+    icon: "leaf",
+    temp: [20, 29],
+    absoluteTemp: [10, 35],
+    rain: [1000, 1500],
+    absoluteRain: [500, 5000],
+    maxElevation: 2000,
+  },
+  // FAO EcoCrop datasheet 820, verified 2026-11-12: https://ecocrop.apps.fao.org/ecocrop/srv/en/dataSheet?id=820
+  {
+    id: 820,
+    name: "Squash",
+    ceb: "Kalabasa",
+    icon: "fruit",
+    temp: [20, 30],
+    absoluteTemp: [10, 40],
+    rain: [600, 1600],
+    absoluteRain: [300, 2800],
+    maxElevation: 2400,
+  },
 ];
 const within = (v: number, r: Range) => v >= r[0] && v <= r[1];
 export function cropMatches(profile: Climate | null, elevation: number | null) {
@@ -109,7 +157,7 @@ export function cropMatches(profile: Climate | null, elevation: number | null) {
         Number(within(temperature, c.temp)) + Number(within(rainfall, c.rain)),
     }))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
-    .slice(0, 3);
+    .slice(0, 7);
 }
 
 export function cropRecommendations(
@@ -133,7 +181,7 @@ export function cropRecommendations(
   const matches = candidates
     .filter((c) => !c.unmet.length)
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
-    .slice(0, 3);
+    .slice(0, 7);
   if (matches.length < 2)
     matches.push(
       ...candidates

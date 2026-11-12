@@ -11,9 +11,9 @@ const profile = {
     partial: false,
   })),
 };
-test("environment recommendations cap at three and use tolerances", () => {
+test("environment recommendations cap at seven and use tolerances", () => {
   const results = cropRecommendations(profile, 100)!;
-  assert.equal(results.length, 3);
+  assert.equal(results.length, 7);
   assert.ok(
     results.every((c) => c.unmet.length === 0 && c.absoluteTemp.length === 2),
   );
@@ -36,4 +36,15 @@ test("environment fills to two explicitly labelled alternatives", () => {
 test("environment does not invent missing climate matches", () => {
   assert.equal(cropRecommendations(null, 100), null);
   assert.equal(cropRecommendations(profile, null), null);
+});
+
+test("expanded catalog retains sourced thresholds and deterministic ranking", () => {
+  const results = cropRecommendations(profile, 100)!;
+  assert.deepEqual(results, cropRecommendations(profile, 100));
+  assert.ok(results.some((c) => c.id === 1265));
+  assert.ok(results.some((c) => c.id === 1420));
+  assert.ok(results.some((c) => c.id === 820));
+  for (let i = 1; i < results.length; i++) {
+    assert.ok(results[i - 1].score >= results[i].score);
+  }
 });

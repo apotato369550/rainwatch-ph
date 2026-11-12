@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { conditionRows } from "@/lib/tanom/view-data";
-import { Analysis } from "./analysis";
+import { Analysis, type AnalysisCache } from "./analysis";
 import {
   analysisRequest,
   conditionsContext,
@@ -21,10 +21,16 @@ export function Conditions({
   data,
   ceb,
   point,
+  insightsEnabled,
+  active,
+  analysisCache,
 }: {
   data: Environment | null;
   ceb: boolean;
   point: Point;
+  insightsEnabled: boolean;
+  active: boolean;
+  analysisCache: AnalysisCache;
 }) {
   const [hourly, setHourly] = useState(false);
   const [selected, setSelected] = useState(0);
@@ -82,11 +88,7 @@ export function Conditions({
   const request = analysisRequest(
     point,
     ceb,
-    conditionsContext(
-      data,
-      hourly,
-      s.key as "temperature" | "rainfall" | "soil",
-    ),
+    conditionsContext(data, true, "temperature"),
   );
   return (
     <div ref={stackRef} className="conditions-stack">
@@ -214,7 +216,14 @@ export function Conditions({
           )}
         </div>
       </section>
-      <Analysis key={JSON.stringify(request)} request={request} ceb={ceb} />
+      <Analysis
+        request={request}
+        ceb={ceb}
+        enabled={insightsEnabled}
+        active={active}
+        cache={analysisCache}
+        title={t("Next 24 hours overview", "Kinatibuk-ang sunod 24 oras")}
+      />
     </div>
   );
 }

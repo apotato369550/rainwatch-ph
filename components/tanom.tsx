@@ -21,10 +21,10 @@ import {
 import { seasonalRows } from "@/lib/tanom/view-data";
 import "./tanom.css";
 import { ConditionCards } from "./tanom/condition-cards";
-import { Analysis } from "./tanom/analysis";
+import { Analysis, type AnalysisCache } from "./tanom/analysis";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CropCard } from "./tanom/crop-card";
+import { CropCarousel } from "./tanom/crop-carousel";
 type DashboardSection = "home" | "conditions" | "growing" | "planning" | "ml";
 const sections: Record<string, DashboardSection> = {
   "/": "home",
@@ -47,6 +47,11 @@ export function Tanom() {
   const [tab, setTab] = useState<"6" | "annual">("6");
   const [outlookEnabled, setOutlookEnabled] = useState(page === "planning");
   const gpsRequest = useRef(0);
+  const [analysisCache] = useState<AnalysisCache>(() => new Map());
+  const [enabledPoint, setEnabledPoint] = useState<string | null>(null);
+  const pointKey = JSON.stringify([point.lat, point.lon]);
+  const insightsEnabled = enabledPoint === pointKey;
+  if (enabledPoint !== null && enabledPoint !== pointKey) setEnabledPoint(null);
   const t = (en: string, ce: string) => (ceb ? ce : en);
   useEffect(() => {
     document.documentElement.lang = ceb ? "ceb" : "en";
@@ -78,7 +83,10 @@ export function Tanom() {
     climateSchema,
   );
   const data = environment.data;
-  const matches = cropRecommendations(climate.data, data?.elevation ?? null);
+  const matches = cropRecommendations(
+    climate.data,
+    data?.elevation ?? null,
+  )?.filter((crop) => !crop.unmet.length);
   const dateTime = (s: string) =>
     new Date(s).toLocaleString(ceb ? "ceb-PH" : "en-PH", {
       month: "short",
@@ -282,9 +290,10 @@ export function Tanom() {
             >
               <ConditionCards data={data} ceb={ceb} />
               <Analysis
-                key={JSON.stringify(
-                  analysisRequest(point, ceb, dashboardContext(data)),
-                )}
+                enabled={insightsEnabled}
+                active={page === "home"}
+                cache={analysisCache}
+                title={t("Current conditions", "Kondisyon karon")}
                 request={analysisRequest(point, ceb, dashboardContext(data))}
                 ceb={ceb}
               />
@@ -294,7 +303,14 @@ export function Tanom() {
               hidden={page !== "conditions"}
               data-section="conditions"
             >
-              <Conditions data={data} ceb={ceb} point={point} />
+              <Conditions
+                data={data}
+                ceb={ceb}
+                point={point}
+                insightsEnabled={insightsEnabled}
+                active={page === "conditions"}
+                analysisCache={analysisCache}
+              />
             </div>
             <div
               className="dashboard-panel environment-panel"
@@ -338,11 +354,17 @@ export function Tanom() {
                   </div>
                 )}
                 {matches && matches.length > 0 ? (
-                  <div className="crop-grid">
-                    {matches.map((crop) => (
-                      <CropCard key={crop.id} crop={crop} ceb={ceb} />
-                    ))}
-                  </div>
+                  <>
+                    <CropCarousel key={pointKey} crops={matches} ceb={ceb} />
+                    {matches.length < 7 && (
+                      <p className="microcopy">
+                        {t(
+                          `Only ${matches.length} qualifying crop matches. No alternatives added to fill the list.`,
+                          `${matches.length} lang ka nahiuyon nga tanom. Walay gidugang nga dili nahiuyon.`,
+                        )}
+                      </p>
+                    )}
+                  </>
                 ) : (
                   !climate.loading && (
                     <p className="status-note">
@@ -367,13 +389,10 @@ export function Tanom() {
                 </p>
               </section>
               <Analysis
-                key={JSON.stringify(
-                  analysisRequest(
-                    point,
-                    ceb,
-                    environmentContext(data, climate.data),
-                  ),
-                )}
+                enabled={insightsEnabled}
+                active={page === "growing"}
+                cache={analysisCache}
+                title={t("Climate and crops", "Klima ug tanom")}
                 request={analysisRequest(
                   point,
                   ceb,
@@ -390,10 +409,13 @@ export function Tanom() {
               <section className="tanom-panel season">
                 <div className="section-title">
                   <div>
-                    <p className="eyeline">
-                      {t("LOOK A LITTLE FURTHER", "TAN-AW SA UMAABOT")}
-                    </p>
                     <h2>{t("Seasonal planning", "Plano sa panahon")}</h2>
+                    <p className="microcopy">
+                      {t(
+                        "Explore the next six months or typical yearly weather to help plan planting and farm activities.",
+                        "Tan-awa ang panahon sa sunod unom ka bulan o ang kasagarang panahon matag tuig aron makatabang sa pagplano sa pagtanom ug mga buluhaton sa uma.",
+                      )}
+                    </p>
                   </div>
                   <CalendarDays size={28} aria-hidden="true" />
                 </div>
@@ -445,27 +467,16 @@ export function Tanom() {
                     </p>
                   </>
                 )}
-                <p className="limitations">
-                  <Info size={18} aria-hidden="true" />
-                  {tab === "annual"
-                    ? t(
-                        "1991–2020 ERA5 historical climate profile, not a forecast or local weather-station record.",
-                        "Ang reanalysis modelo sa kasaysayan, dili lokal nga weather station.",
-                      )
-                    : t(
-                        "ECMWF SEAS5 regional ensemble mean, approximately 36 km resolution, not bias-corrected. Long-range forecasts are uncertain. No farm-level confidence or above/below-normal claims are inferred. Partial months are labeled, not extrapolated.",
-                        "Dili sigurado ang dugay nga forecast. Ang kulang nga bulan gimarkahan ug wala gipuno.",
-                      )}
-                </p>
               </section>
               <Analysis
-                key={JSON.stringify(
-                  analysisRequest(
-                    point,
-                    ceb,
-                    seasonalContext(season.data, tab),
-                  ),
-                )}
+                enabled={insightsEnabled}
+                active={page === "planning"}
+                cache={analysisCache}
+                title={
+                  tab === "6"
+                    ? t("Next six months", "Sunod unom ka bulan")
+                    : t("Annual climate", "Tinuig nga klima")
+                }
                 request={analysisRequest(
                   point,
                   ceb,
@@ -498,6 +509,30 @@ export function Tanom() {
               accuracy={accuracy}
               ceb={ceb}
             />
+            <section
+              className="tanom-panel insights-control"
+              aria-label={t(
+                "AI insights controls",
+                "Mga kontrol sa AI insights",
+              )}
+            >
+              <button
+                aria-pressed={insightsEnabled}
+                onClick={() =>
+                  setEnabledPoint(insightsEnabled ? null : pointKey)
+                }
+              >
+                {insightsEnabled
+                  ? t("Disable AI insights", "I-disable ang AI insights")
+                  : t("Enable AI insights", "I-enable ang AI insights")}
+              </button>
+              <p>
+                {t(
+                  "For this exact point only. Coordinates and modeled data are sent to OpenRouter when you open a report tab. Not a field assessment.",
+                  "Alang lang niining eksaktong punto. Ipadala ang lokasyon ug datos sa OpenRouter kon ablihan ang report tab. Dili kini pagtimbang sa uma.",
+                )}
+              </p>
+            </section>
           </aside>
         </div>
         <footer className="tanom-footer">

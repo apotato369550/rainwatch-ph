@@ -1,0 +1,45 @@
+# Public AI backend deployment
+
+## Required migration (not applied by this change)
+
+1. Review `supabase/migrations/202611120001_public_analysis.sql` alongside pending migrations. Back up the intended database.
+2. With the correct project selected, an operator applies the migration using the normal Supabase migration workflow (`supabase db push` after reviewing the pending migration list). **Do not use `npm run db:seed` in production**: it resets a database. Alternatively run this specific SQL migration in the project's SQL editor and reconcile migration history using your normal process.
+3. Verify both tables have RLS enabled, no anon/authenticated policies or grants, and only `service_role` has application access to `analysis_admit` / `analysis_finish`. Functions have a fixed empty search path and fully qualified table names. Database administrators retain administrative access.
+4. Set server-only configuration in `.env.example`: service-role key, Supabase URL, OpenRouter key/free model, IP hashing secret, and explicit proxy strategy. Keep these stable across replicas. Do not expose service-role credentials or the hashing secret to browsers.
+5. Deploy only after storage is reachable and migrated. Missing configuration, failed RPCs (including HTTP 521), and invalid storage responses return 503, with no provider generation or memory fallback. A sleeping/unreachable Supabase project must be restored first. This backend implementation applied no remote migration and made no remote database calls; the orchestrator separately reported a read-only connectivity check returning HTTP 521.
+
+Run unit checks with `npm test`; run the transaction/permission checks in `tests/analysis-storage.sql` against a **disposable local Supabase database**, after applying migrations. That SQL test rolls back. It must not be pointed at production: it temporarily clears the analysis tables inside its transaction. The repository does not automatically run this SQL test. Actual multi-connection load/concurrency verification is still a deployment gate; mocked route tests do not prove database behavior.
+
+## Trusted client IP
+
+There is no default strategy, no cookie exemption, and no client-provided visitor identifier. Missing/invalid identity fails closed even on cache reads.
+
+- `single-header`: set `ANALYSIS_IP_HEADER` to the lowercase header your trusted edge **overwrites** with the peer IP. Lists, ports, hostnames and malformed IPs are rejected.
+- `xff`: set `ANALYSIS_TRUSTED_PROXY_HOPS` to your fixed trusted append-only proxy chain length (1–10). The identity is taken from that many positions from the right of `X-Forwarded-For`, not the attacker-controlled leftmost value. Each trusted proxy must append the true peer address; deployments that replace rather than append XFF need a different strategy.
+- Block direct origin access and routes bypassing the trusted chain. A generic Next.js Request cannot establish which network peer supplied a header; incorrectly trusting a public header defeats IP quotas. Do not use these example header names without validating the actual hosting/proxy behavior. Variable path lengths require an overwriting edge header instead.
+
+IPv6 text aliases and IPv4-mapped IPv6 normalize before HMAC-SHA256 hashing. Raw IPs are not stored or logged. All replicas must use the same >=32-character secret. Rotating it changes identities and effectively resets per-IP counters; rotate deliberately, not daily. Shared NAT users share the five-attempt limit; clients controlling multiple IPs have multiple IP limits, but still share the 40-attempt site cap. No cookies are needed.
+
+## Admission and cache semantics
+
+- Atomic database transactions serialize admission across workers. UTC calendar-day generation caps: **40 site-wide**, **5 per IP**. A reserved attempt is consumed before any snapshot fetching; timeout, malformed context, crash, provider error, and incomplete output never refund it.
+- Fixed UTC minute burst caps: **120 requests/site** and **10 requests/IP**, including cache hits and busy/quota responses. Boundary bursts can span two windows. This is not an edge DoS shield; configure request/body/time limits at the proxy as well.
+- **2 active generation leases/site**, **1/IP**, **1/cache key**. Each lease is 180 seconds. New calls get `AI_BUSY` (429), not queued work. Only the matching owner UUID with an unexpired lease can complete/release; expired owners cannot overwrite a replacement. There is no provider retry or background job. A killed worker may consume an attempt and hold a slot until lease expiry. Leases fence persistence; a process suspended beyond its lease can still finish an in-flight provider request, whose stale output is discarded.
+- Valid cache reads happen before daily attempt checks and do not consume generation quota. Burst limits still apply. Reports are shared across visitors. No stale-while-revalidate or stale-on-error report fallback.
+- Report TTL: dashboard/conditions **6 hours**, six-month seasonal **7 days**, annual historical/environment **30 days**. Environment uses historical climate and static elevation only, not present weather advice. Snapshots are fetched through the existing server provider handlers (Open-Meteo forecast, SEAS5, ERA5); no self-HTTP request, browser snapshot or Host-derived endpoint is trusted. Existing provider data caches may already be 10 minutes (forecast) / 1 day (seasonal/archive) old. `contextFetchedAt` records server retrieval time, not the source model's issue time; `observedAt` is retained for compatibility and means profile retrieval time on historical/environment reports.
+- Cache keys hash exact numeric latitude/longitude (no rounding), language, normalized report variant, actual composed prompt text, configured model ID/version, token budget, reasoning setting, and server-context version. Conditions daily/hourly requests intentionally map to the same next24 report. Set `ANALYSIS_MODEL_VERSION` when an alias changes; bump `server-context-v1` in code when snapshot/crop recommendation semantics change. `openrouter/free` is a dynamic router, so it cannot promise reproducible underlying model selection.
+- Daily/burst buckets older than two days are pruned during admission. Report rows are retained until explicit maintenance. If needed, an operator may delete expired payloads/abandoned rows only when `lease_until IS NULL OR lease_until < now()` and `expires_at IS NULL OR expires_at < now()`; never clear active leases or current quota buckets. At 40 generations/day growth is bounded by that generation rate, not visitor count; burst-IP bucket cardinality still depends on request volume.
+
+## Frontend/orchestrator contract
+
+`POST /api/analysis` retains `{lat, lon, ceb, context: {view, period, ...}}`. Only coordinates, boolean language and valid report selection are read. Additional snapshot, prompt, model, recommendations, rows and timestamps are stripped/ignored, not trusted. A minimal selection works without any snapshot:
+
+```json
+{"lat":10.3157,"lon":123.8854,"ceb":false,"context":{"view":"conditions","period":"hourly"}}
+```
+
+Selections: dashboard/current, conditions/hourly or daily (both become hourly), seasonal/6 or annual, environment/climate. Conditions always contains 24 contiguous hourly rows covering temperature, rainfall and modeled surface soil moisture starting at the server forecast's current hour. `variable: "temperature"` is retained only for existing schema compatibility; server prompt instructions explicitly require all three variables. This can differ from the UI's displayed variable/window; the frontend should label the AI report “Next 24 hours · all variables.” No UI/crop files are changed here.
+
+Success retains `analysis`, `model` (configured model/router ID), `observedAt`; adds `generatedAt`, `contextFetchedAt`, `cached`, `ageSeconds`, `expiresAt`. HTTP responses are `no-store`; durable reuse is server-side only. New error codes: 503 `AI_STORAGE_UNAVAILABLE`, `AI_IDENTITY_UNAVAILABLE`, paid-model `AI_CONFIG_INVALID`; 429 `AI_BURST_LIMIT`, `AI_SITE_QUOTA`, `AI_VISITOR_QUOTA`, `AI_BUSY`; 502 `AI_INCOMPLETE_OUTPUT` for any finish reason other than `stop` (including missing/unknown reasons, tool calls and provider errors with partial text). Existing provider/auth/credits/rate/timeout/output-limit/empty-output errors remain. Existing provider handlers swallow their own timeouts into provider errors, so context-source timeouts surface as `WEATHER_INVALID` (502); the route retains `CONTEXT_TIMEOUT` when a timeout propagates.
+
+Only `openrouter/free` or explicit `vendor/model:free` is accepted. Requests set zero prompt/completion price ceilings and disable provider fallback; there is no model fallback list or automatic retry. See [OpenRouter provider-routing documentation](https://github.com/OpenRouterTeam/docs/blob/main/guides/routing/provider-selection.mdx). Free capacity, output quality, and provider availability are not guaranteed. HTTP 402 still preserves the prior error contract, not permission to switch to a paid model.

@@ -40,6 +40,13 @@ test("TANOM live-data layout, map, matching, language, planning and accessible r
     .scrollIntoViewIfNeeded();
   await expect(page.locator(".crop-card").first()).toBeVisible();
   await page.goto("/planning");
+  const planning = page.locator('[data-section="planning"]');
+  await expect(planning).toContainText(
+    "Explore the next six months or typical yearly weather to help plan planting and farm activities.",
+  );
+  await expect(planning.locator(".eyeline")).toHaveCount(0);
+  await expect(planning.locator(".limitations")).toHaveCount(0);
+
   await page
     .getByRole("button", { name: "Annual climate profile", exact: true })
     .click();

@@ -46,6 +46,27 @@ export function CropCard({ crop, ceb }: { crop: Crop; ceb: boolean }) {
             <circle cx="60" cy="63" r="29" fill="#d9957f" />
             <path d="m60 38-18-8 18 1 10-14-2 16 18 1-18 9Z" fill="#9db77b" />
           </>
+        ) : crop.id === 1574 ? (
+          <>
+            <path d="M60 96V26M60 48 36 30M60 60 84 39M60 74 35 56" />
+            {[0, 1, 2].map((i) => (
+              <g key={i} fill="#edcc70">
+                <ellipse cx={34 + i * 8} cy={27 + i * 6} rx="5" ry="9" transform={`rotate(-35 ${34 + i * 8} ${27 + i * 6})`} />
+                <ellipse cx={82 - i * 7} cy={36 + i * 6} rx="5" ry="9" transform={`rotate(35 ${82 - i * 7} ${36 + i * 6})`} />
+              </g>
+            ))}
+          </>
+        ) : crop.id === 820 ? (
+          <>
+            <ellipse cx="60" cy="66" rx="35" ry="27" fill="#e4b269" />
+            <ellipse cx="60" cy="66" rx="16" ry="27" />
+            <path d="M60 39V27q0-10 12-10" />
+          </>
+        ) : crop.id === 1265 || crop.id === 1420 ? (
+          <>
+            <path d="M34 91q-17-14 5-38l30-22q27-9 21 16L65 83q-17 22-31 8Z" fill={crop.id === 1265 ? "#bd968c" : "#c8af82"} />
+            <path d="m43 65 9 7m4-22 10 7m-10 19 6 4M78 33q-2-17 15-16" />
+          </>
         ) : (
           <>
             <path d="M25 79Q48 18 91 28 100 62 25 79Z" fill="#b7ce91" />
