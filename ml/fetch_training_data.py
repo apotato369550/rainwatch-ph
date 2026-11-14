@@ -1,28 +1,79 @@
-"""Export causal forecast/verification rows from Supabase to ml/data/training.csv."""
-import os
-from pathlib import Path
+"""Download immutable run forecasts and an ERA5 verification proxy."""
+import time
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import requests
+import numpy as np
 import pandas as pd
-URL=os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "").rstrip("/")
-KEY=os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-if not URL or not KEY: raise SystemExit("Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
-headers={"apikey":KEY,"Authorization":f"Bearer {KEY}"}
-def table(name, select):
- r=requests.get(f"{URL}/rest/v1/{name}", params={"select":select, "limit":100000}, headers=headers, timeout=60); r.raise_for_status(); return pd.DataFrame(r.json())
-f=table("weather_forecasts", "location_id,forecast_generated_at,forecast_for,precipitation,precipitation_probability,humidity,surface_pressure,cloud_cover,wind_speed,cape,soil_moisture")
-o=table("weather_observations", "location_id,observed_at,precipitation")
-l=table("locations", "id,latitude,longitude")
-f["forecast_for"]=pd.to_datetime(f.forecast_for, utc=True); f["forecast_generated_at"]=pd.to_datetime(f.forecast_generated_at, utc=True); o["observed_at"]=pd.to_datetime(o.observed_at, utc=True)
-df=f.merge(o, left_on=["location_id","forecast_for"], right_on=["location_id","observed_at"], suffixes=("", "_actual")).merge(l, left_on="location_id", right_on="id")
-df.rename(columns={"precipitation":"raw_precipitation", "precipitation_actual":"actual_precipitation"}, inplace=True)
-# Lags are strictly as-of issue time; never use precipitation after forecast_generated_at.
-for hours in (3,6,24):
- out=[]
- for row in df.itertuples():
-  prior=o[(o.location_id==row.location_id)&(o.observed_at<=row.forecast_generated_at)&(o.observed_at>row.forecast_generated_at-pd.Timedelta(hours=hours))]
-  out.append(prior.precipitation.sum() if len(prior) else float("nan"))
- df[f"previous_{hours}h_rainfall"]=out
-df["forecast_lead_hours"]=(df.forecast_for-df.forecast_generated_at).dt.total_seconds()/3600
-df["hour_sin"]=__import__("numpy").sin((df.forecast_for.dt.hour+8)*__import__("numpy").pi/12); df["hour_cos"]=__import__("numpy").cos((df.forecast_for.dt.hour+8)*__import__("numpy").pi/12)
-df["month_sin"]=__import__("numpy").sin(df.forecast_for.dt.month*__import__("numpy").pi/6); df["month_cos"]=__import__("numpy").cos(df.forecast_for.dt.month*__import__("numpy").pi/6)
-Path("data").mkdir(exist_ok=True); df.to_csv("data/training.csv", index=False); print(f"wrote {len(df)} causal rows")
+from common import ROOT, VARIABLES, FEATURES, arguments, dates, paths, write_json
+
+BASE = dict(latitude=10.3157, longitude=123.8854, timezone='UTC', precipitation_unit='mm', wind_speed_unit='kmh', temperature_unit='celsius')
+
+def download(url, params, cache, validate):
+    if cache.exists():
+        value = __import__('json').loads(cache.read_text())
+        validate(value['response'])
+        return value
+    for attempt in range(3):
+        try:
+            r = requests.get(url, params=params, timeout=60)
+            if r.status_code == 429 or r.status_code >= 500:
+                if attempt == 2:
+                    r.raise_for_status()
+                retry = r.headers.get('Retry-After', '2')
+                try:
+                    delay = float(retry)
+                except ValueError:
+                    delay = max(0, (parsedate_to_datetime(retry)-datetime.now(timezone.utc)).total_seconds())
+                time.sleep(max(delay, 2 ** attempt))
+                continue
+            r.raise_for_status()
+            response = r.json()
+            validate(response)
+            value = dict(response=response, url=url, params=params, retrieved_at=datetime.now(timezone.utc).isoformat())
+            write_json(cache, value)
+            return value
+        except (requests.ConnectionError, requests.Timeout):
+            if attempt == 2:
+                raise
+            time.sleep(2 ** attempt)
+    raise RuntimeError('Download failed')
+
+def frame(response, variables):
+    h = response['hourly']
+    units = response['hourly_units']
+    expected = {'precipitation':'mm', 'temperature_2m':'°C', 'relative_humidity_2m':'%', 'surface_pressure':'hPa', 'cloud_cover':'%', 'wind_speed_10m':'km/h'}
+    if response.get('utc_offset_seconds') != 0 or any(units.get(v) != expected[v] for v in variables):
+        raise ValueError('Unexpected units or timezone')
+    df = pd.DataFrame({k:h[k] for k in ['time', *variables]})
+    df['time'] = pd.to_datetime(df.time, utc=True)
+    if df.time.duplicated().any():
+        raise ValueError('Duplicate provider timestamps')
+    return df.set_index('time')
+
+def main(month):
+    days = dates(month)
+    cache = ROOT / 'data' / 'raw' / month
+    reference = download('https://archive-api.open-meteo.com/v1/archive', {**BASE, 'models':'era5', 'start_date':days[0].strftime('%Y-%m-%d'), 'end_date':days[-1].strftime('%Y-%m-%d'), 'hourly':'precipitation'}, cache/'era5.json', lambda r:frame(r,['precipitation']))
+    ref = frame(reference['response'], ['precipitation'])
+    rows = []
+    for day in days:
+        run = day - pd.Timedelta(days=1)
+        value = download('https://single-runs-api.open-meteo.com/v1/forecast', {**BASE, 'models':'ecmwf_ifs', 'run':run.strftime('%Y-%m-%dT%H:%M'), 'forecast_days':3, 'hourly':','.join(VARIABLES)}, cache/f'{run:%Y-%m-%d}.json', lambda r:frame(r,VARIABLES))
+        forecast = frame(value['response'], VARIABLES)
+        for target in pd.date_range(day, periods=24, freq='h'):
+            f = forecast.loc[target]
+            rain = ref.loc[target, 'precipitation']
+            if not np.isfinite(rain) or not np.isfinite(f.precipitation):
+                raise ValueError(f'Missing rainfall at {target}')
+            local_hour = (target.hour + 8) % 24
+            rows.append(dict(target_time=target.isoformat(), initialization=run.isoformat(), assumed_available_at=(run+pd.Timedelta(hours=6)).isoformat(), latitude=BASE['latitude'], longitude=BASE['longitude'], forecast_model='ecmwf_ifs', reference_model='era5', forecast_retrieved_at=value['retrieved_at'], reference_retrieved_at=reference['retrieved_at'], rainfall_unit='mm', raw_precipitation=f.precipitation, reference_precipitation=rain, **{v:f[v] for v in VARIABLES[1:]}, lead_hours=(target-run).total_seconds()/3600, hour_sin=np.sin(local_hour*np.pi/12), hour_cos=np.cos(local_hour*np.pi/12)))
+        print(f'Downloaded {day:%Y-%m-%d}', flush=True)
+    df = pd.DataFrame(rows)
+    path = paths(month)[0]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(path, index=False)
+    write_json(ROOT/'reports'/f'{month}-quality.json', dict(expected_rows=len(days)*24, matched_rows=len(df), missing_features=df[FEATURES].isna().sum().to_dict(), rainy_hours=int((df.reference_precipitation>0).sum()), heavy_5_hours=int((df.reference_precipitation>=5).sum()), heavy_10_hours=int((df.reference_precipitation>=10).sum())))
+
+if __name__ == '__main__':
+    main(arguments())
