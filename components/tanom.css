@@ -4,7 +4,7 @@
   --orange: #a74610;
   --ochre: #866213;
   --line: #c6cfcf;
-  background: #f7f4eb;
+  background: transparent;
   color: var(--ink);
   min-height: 100vh;
   font-size: 18px;
@@ -1579,3 +1579,18 @@
     scroll-behavior: auto;
   }
 }
+.tanom .page-intro { display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap; }
+.tanom .insights-control { margin:0; max-width:390px; }
+.tanom .insights-control button { display:flex; align-items:center; gap:12px; background:transparent; border:0; }
+.tanom .ai-switch-track { width:48px; height:28px; border-radius:20px; background:#647785; padding:4px; display:inline-block; }
+.tanom .ai-switch-track span { display:block; width:20px; height:20px; border-radius:50%; background:white; }
+.tanom [aria-checked="true"] .ai-switch-track { background:#176b91; }
+.tanom [aria-checked="true"] .ai-switch-track span { transform:translateX(20px); }
+.tanom .crop-carousel { position:relative; padding-inline:48px; }
+.tanom .crop-carousel-track { gap:12px; scrollbar-width:none; padding:4px 0 10px; }
+.tanom .crop-carousel-track::-webkit-scrollbar { display:none; }
+.tanom .crop-carousel-slide { flex:0 0 min(280px, 100%); }
+.tanom .crop-carousel-slide .crop-card { width:100%; margin:0; }
+.tanom .crop-prev, .tanom .crop-next { position:absolute; top:45%; width:40px; min-height:44px; padding:0; }
+.tanom .crop-prev { left:0; }
+.tanom .crop-next { right:0; }

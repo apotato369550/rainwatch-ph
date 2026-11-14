@@ -252,6 +252,30 @@ export function Tanom() {
                         )}
             </h1>
           </div>
+            <section
+              className="insights-control"
+              aria-label={t(
+                "AI insights controls",
+                "Mga kontrol sa AI insights",
+              )}
+            >
+              <button
+                role="switch"
+                aria-checked={insightsEnabled}
+                onClick={() =>
+                  setEnabledPoint(insightsEnabled ? null : pointKey)
+                }
+              >
+                <span className="ai-switch-track" aria-hidden="true"><span /></span>
+                {t("Enable AI insights", "I-enable ang AI insights")}
+              </button>
+              <p>
+                {t(
+                  "For this exact point only. Coordinates and modeled data are sent to OpenRouter when you open a report tab. Not a field assessment.",
+                  "Alang lang niining eksaktong punto. Ipadala ang lokasyon ug datos sa OpenRouter kon ablihan ang report tab. Dili kini pagtimbang sa uma.",
+                )}
+              </p>
+            </section>
         </section>
         {environment.loading && (
           <p className="status-note" role="status">
@@ -354,17 +378,7 @@ export function Tanom() {
                   </div>
                 )}
                 {matches && matches.length > 0 ? (
-                  <>
-                    <CropCarousel key={pointKey} crops={matches} ceb={ceb} />
-                    {matches.length < 7 && (
-                      <p className="microcopy">
-                        {t(
-                          `Only ${matches.length} qualifying crop matches. No alternatives added to fill the list.`,
-                          `${matches.length} lang ka nahiuyon nga tanom. Walay gidugang nga dili nahiuyon.`,
-                        )}
-                      </p>
-                    )}
-                  </>
+                  <CropCarousel key={pointKey} crops={matches} ceb={ceb} />
                 ) : (
                   !climate.loading && (
                     <p className="status-note">
@@ -509,30 +523,7 @@ export function Tanom() {
               accuracy={accuracy}
               ceb={ceb}
             />
-            <section
-              className="tanom-panel insights-control"
-              aria-label={t(
-                "AI insights controls",
-                "Mga kontrol sa AI insights",
-              )}
-            >
-              <button
-                aria-pressed={insightsEnabled}
-                onClick={() =>
-                  setEnabledPoint(insightsEnabled ? null : pointKey)
-                }
-              >
-                {insightsEnabled
-                  ? t("Disable AI insights", "I-disable ang AI insights")
-                  : t("Enable AI insights", "I-enable ang AI insights")}
-              </button>
-              <p>
-                {t(
-                  "For this exact point only. Coordinates and modeled data are sent to OpenRouter when you open a report tab. Not a field assessment.",
-                  "Alang lang niining eksaktong punto. Ipadala ang lokasyon ug datos sa OpenRouter kon ablihan ang report tab. Dili kini pagtimbang sa uma.",
-                )}
-              </p>
-            </section>
+
           </aside>
         </div>
         <footer className="tanom-footer">

@@ -1,109 +1,60 @@
 "use client";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { cropRecommendations } from "@/lib/tanom/crops";
 import { CropCard } from "./crop-card";
 type Crop = NonNullable<ReturnType<typeof cropRecommendations>>[number];
 export function CropCarousel({ crops, ceb }: { crops: Crop[]; ceb: boolean }) {
   const track = useRef<HTMLDivElement>(null);
-  const [index, setIndex] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
+  const [order, setOrder] = useState<string[]>([]);
+  const [overflow, setOverflow] = useState(false);
   const id = useId();
-  const t = (en: string, ce: string) => (ceb ? ce : en);
-  function go(next: number) {
+  const signature = crops.map(c => c.id).join("|");
+  useEffect(() => {
+    const ids = signature.split("|");
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    const frame = requestAnimationFrame(() => setOrder(ids));
+    return () => cancelAnimationFrame(frame);
+  }, [signature]);
+  const sorted = [...crops].sort((a,b) => order.indexOf(String(a.id)) - order.indexOf(String(b.id)));
+  function go(direction: number) {
     const node = track.current;
     if (!node) return;
-    const target = Math.max(0, Math.min(crops.length - 1, next));
-    const slide = node.children[target] as HTMLElement | undefined;
-    if (!slide) return;
-    node.scrollTo({
-      left: slide.offsetLeft - (node.children[0] as HTMLElement).offsetLeft,
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "instant"
-        : "smooth",
-    });
-    setIndex(target);
+    const max = node.scrollWidth - node.clientWidth;
+    const step = (node.children[0] as HTMLElement)?.offsetWidth + 12;
+    let next = node.scrollLeft + direction * step;
+    if (direction > 0 && node.scrollLeft >= max - 2) next = 0;
+    if (direction < 0 && node.scrollLeft <= 2) next = max;
+    node.scrollTo({ left: Math.max(0, Math.min(max, next)), behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
   }
-  return (
-    <div
-      className="crop-carousel"
-      role="region"
-      aria-roledescription={t("carousel", "carousel")}
-      aria-label={t("Qualifying crop matches", "Mga nahiuyon nga tanom")}
-    >
-      <div className="crop-carousel-controls">
-        <button
-          aria-label={t("Previous crop", "Miaging tanom")}
-          aria-controls={id}
-          disabled={index === 0}
-          onClick={() => go(index - 1)}
-        >
-          ←
-        </button>
-        <span role="status" aria-live="polite" aria-atomic="true">
-          {t("Crop", "Tanom")} {index + 1} {t("of", "sa")} {crops.length}
-        </span>
-        <button
-          aria-label={t("Next crop", "Sunod nga tanom")}
-          aria-controls={id}
-          disabled={index === crops.length - 1}
-          onClick={() => go(index + 1)}
-        >
-          →
-        </button>
-      </div>
-      <div
-        id={id}
-        className="crop-carousel-track"
-        ref={track}
-        tabIndex={0}
-        aria-label={t(
-          "Crop cards; use left and right arrow keys",
-          "Mga tanom; gamita ang wala ug tuo nga arrow",
-        )}
-        onKeyDown={(event) => {
-          if (event.target !== event.currentTarget) return;
-          const next =
-            event.key === "ArrowRight"
-              ? index + 1
-              : event.key === "ArrowLeft"
-                ? index - 1
-                : event.key === "Home"
-                  ? 0
-                  : event.key === "End"
-                    ? crops.length - 1
-                    : null;
-          if (next !== null) {
-            event.preventDefault();
-            go(next);
-          }
-        }}
-        onScroll={() => {
-          const node = track.current;
-          if (!node) return;
-          const slides = Array.from(node.children) as HTMLElement[];
-          const start = slides[0]?.offsetLeft ?? 0;
-          const nearest = slides.reduce(
-            (best, slide, i) =>
-              Math.abs(slide.offsetLeft - start - node.scrollLeft) <
-              Math.abs(slides[best].offsetLeft - start - node.scrollLeft)
-                ? i
-                : best,
-            0,
-          );
-          setIndex(nearest);
-        }}
-      >
-        {crops.map((crop, i) => (
-          <div
-            className="crop-carousel-slide"
-            key={crop.id}
-            role="group"
-            aria-roledescription={t("slide", "slide")}
-            aria-label={`${i + 1} ${t("of", "sa")} ${crops.length}`}
-          >
-            <CropCard crop={crop} ceb={ceb} />
-          </div>
-        ))}
-      </div>
+  useEffect(() => {
+    const node = track.current;
+    const region = root.current;
+    if (!node || !region) return;
+    let visible = false;
+    let last = Date.now();
+    const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; last = Date.now(); });
+    observer.observe(region);
+    const resize = new ResizeObserver(() => setOverflow(node.scrollWidth > node.clientWidth + 2));
+    resize.observe(node);
+    const reset = () => { last = Date.now(); };
+    region.addEventListener("click", reset);
+    region.addEventListener("keydown", reset);
+    region.addEventListener("touchstart", reset);
+    const timer = setInterval(() => {
+      if (!visible || document.hidden || region.matches(":hover") || region.contains(document.activeElement) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { last = Date.now(); return; }
+      if (Date.now() - last >= 6000) { go(1); last = Date.now(); }
+    }, 250);
+    return () => { clearInterval(timer); observer.disconnect(); resize.disconnect(); region.removeEventListener("click", reset); region.removeEventListener("keydown", reset); region.removeEventListener("touchstart", reset); };
+  }, [signature]);
+  return <div ref={root} className="crop-carousel" role="region" aria-roledescription="carousel" aria-label={ceb ? "Mga nahiuyon nga tanom" : "Qualifying crop matches"}>
+    {overflow && <button className="crop-prev" aria-label={ceb ? "Miaging tanom" : "Previous crop"} aria-controls={id} onClick={() => go(-1)}>←</button>}
+    <div id={id} ref={track} className="crop-carousel-track" tabIndex={0} aria-label="Crop cards; use left and right arrow keys" onKeyDown={e => { if(e.target !== e.currentTarget) return; if(e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); go(e.key === "ArrowRight" ? 1 : -1); } if(e.key === "Home" || e.key === "End") { e.preventDefault(); track.current?.scrollTo({left:e.key === "Home" ? 0 : track.current.scrollWidth}); } }}>
+      {sorted.map((crop,i) => <div className="crop-carousel-slide" key={crop.id} role="group" aria-roledescription="slide" aria-label={`${i+1} / ${sorted.length}`}><CropCard crop={crop} ceb={ceb}/></div>)}
     </div>
-  );
+    {overflow && <><button className="crop-next" aria-label={ceb ? "Sunod nga tanom" : "Next crop"} aria-controls={id} onClick={() => go(1)}>→</button></>}
+  </div>;
 }
